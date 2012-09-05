@@ -679,6 +679,7 @@
     <Compile Include="Storage\RAM\RamAttachmentsStorageActions.cs" />
     <Compile Include="Storage\RAM\RamDocumentsStorageActions.cs" />
     <Compile Include="Storage\RAM\RamGeneralStorageActions.cs" />
+    <Compile Include="Storage\RAM\RamIndexingStorageActions.cs" />
     <Compile Include="Storage\RAM\RamListsStorageActions.cs" />
     <Compile Include="Storage\RAM\RamMappedResultStrageAction.cs" />
     <Compile Include="Storage\RAM\RamQueueStorageActions.cs" />

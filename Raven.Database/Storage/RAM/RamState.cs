@@ -1,26 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using Raven.Abstractions.Data;
-using Raven.Database.Indexing;
 
 namespace Raven.Database.Storage.RAM
 {
 	public class RamState
 	{
-		public TransactionalDictionary<string, TransactionalDictionary<string, ListItem>> Lists { get; set; }
-		public TransactionalDictionary<string, TransactionalDictionary<Guid, byte[]>> Queues { get; set; }
-		public TransactionalDictionary<string, TransactionalDictionary<Guid, byte[]>> Tasks { get; set; }
-		public TransactionalDictionary<string, TransactionalValue<long>> Identities { get; set; }
-		public TransactionalDictionary<string, Attachment> Attachments { get; set; }
-		public TransactionalValue<int> AttachmentCount { get; set; }
-		public TransactionalDictionary<string, DocuementWrapper> Documents { get; set; }
+		public TransactionalDictionary<string, TransactionalDictionary<string, ListItem>> Lists { get; private set; }
+		public TransactionalDictionary<string, TransactionalDictionary<Guid, byte[]>> Queues { get; private set; }
+		public TransactionalDictionary<string, TransactionalDictionary<Guid, TaskWrapper>> Tasks { get; private set; }
+		public TransactionalDictionary<string, TransactionalValue<long>> Identities { get; private set; }
+		public TransactionalDictionary<string, Attachment> Attachments { get; private set; }
+		public TransactionalValue<int> AttachmentCount { get; private set; }
+		public TransactionalDictionary<string, DocuementWrapper> Documents { get; private set; }
 		public TransactionalDictionary<string, DocumentsModifiedByTransation> DocumentsModifiedByTransations { get; set; }
-		public TransactionalValue<long> DocumentCount { get; set; }
-		public TransactionalDictionary<Guid, Transaction> Transactions { get;set; }
-		public TransactionalDictionary<string, Index> Indexes { get; set; }
-		public TransactionalDictionary<string, IndexStats> IndexesStats { get; set; }
-		public TransactionalDictionary<string,TransactionalList<MappedResultsWrapper>> MappedResults { get; set; }
-		public TransactionalDictionary<string, TransactionalList<ScheduledReductionInfo>> ScheduledReductions { get; set; } 
+		public TransactionalValue<long> DocumentCount { get; private set; }
+		public TransactionalDictionary<Guid, Transaction> Transactions { get; private set; }
+		public TransactionalDictionary<string, IndexStats> IndexesStats { get; private set; }
+		public TransactionalDictionary<string, IndexStats> IndexesReduceStats { get; private set; }
+		public TransactionalDictionary<string,TransactionalList<MappedResultsWrapper>> MappedResults { get; private set; }
+		public TransactionalDictionary<string, TransactionalList<ScheduledReductionInfo>> ScheduledReductions { get; private set; }
+		public TransactionalDictionary<string, int> IndexesEtag { get; private set; } 
 
 		public RamState()
 		{
@@ -34,9 +34,11 @@ namespace Raven.Database.Storage.RAM
 
 			Transactions = new TransactionalDictionary<Guid, Transaction>(EqualityComparer<Guid>.Default);
 
-			Indexes = new TransactionalDictionary<string, Index>(StringComparer.InvariantCultureIgnoreCase);
-
 			IndexesStats = new TransactionalDictionary<string, IndexStats>(StringComparer.InvariantCultureIgnoreCase);
+
+			IndexesReduceStats = new TransactionalDictionary<string, IndexStats>(StringComparer.InvariantCultureIgnoreCase);
+
+			IndexesEtag = new TransactionalDictionary<string, int>(StringComparer.InvariantCultureIgnoreCase);
 
 			MappedResults = new TransactionalDictionary<string, TransactionalList<MappedResultsWrapper>>(StringComparer.InvariantCultureIgnoreCase,
 				() => new TransactionalList<MappedResultsWrapper>());
@@ -50,8 +52,8 @@ namespace Raven.Database.Storage.RAM
 			Queues = new TransactionalDictionary<string, TransactionalDictionary<Guid, byte[]>>(StringComparer.InvariantCultureIgnoreCase,
 				() => new TransactionalDictionary<Guid, byte[]>(EqualityComparer<Guid>.Default));
 
-			Tasks = new TransactionalDictionary<string, TransactionalDictionary<Guid, byte[]>>(StringComparer.InvariantCultureIgnoreCase,
-				() => new TransactionalDictionary<Guid, byte[]>(EqualityComparer<Guid>.Default));
+			Tasks = new TransactionalDictionary<string, TransactionalDictionary<Guid, TaskWrapper>>(StringComparer.InvariantCultureIgnoreCase,
+				() => new TransactionalDictionary<Guid, TaskWrapper>(EqualityComparer<Guid>.Default));
 
 			Identities = new TransactionalDictionary<string, TransactionalValue<long>>(StringComparer.InvariantCultureIgnoreCase,
 				() => new TransactionalValue<long>{Value = 0L});
@@ -82,5 +84,13 @@ namespace Raven.Database.Storage.RAM
 		public MappedResultInfo MappedResultInfo { get; set; }
 		public string View { get; set; }
 		public string DocumentKey { get; set; }
+		public int Level { get; set; }
+		public int SourceBucket { get; set; }
+	}
+
+	public class TaskWrapper
+	{
+		public byte[] Task { get; set; }
+		public DateTime AddedAt { get; set; }
 	}
 }
