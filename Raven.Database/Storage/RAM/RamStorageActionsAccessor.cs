@@ -24,6 +24,7 @@ namespace Raven.Database.Storage.RAM
 			Transactions = new RamTransactionStorageActions(state, generator);
 			Staleness = new RamStalenessStorageActions(state);
 			MapReduce = new RamMappedResultStrageAction(state, generator);
+			Indexing = new RamIndexingStorageActions(state);
 		}
 
 		public void Dispose()

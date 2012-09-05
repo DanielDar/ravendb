@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Raven.Abstractions;
 using Raven.Database.Impl;
 using Raven.Database.Tasks;
 
@@ -21,7 +22,11 @@ namespace Raven.Database.Storage.RAM
 		public void AddTask(Task task, DateTime addedAt)
 		{
 			state.Tasks.GetOrAdd(task.GetType().FullName)
-				.Set(generator.CreateSequentialUuid(), task.AsBytes());
+				.Set(generator.CreateSequentialUuid(), new TaskWrapper
+				{
+					Task = task.AsBytes(),
+					AddedAt = SystemTime.UtcNow
+				});
 		}
 
 		public T GetMergedTask<T>() where T : Task
@@ -29,7 +34,7 @@ namespace Raven.Database.Storage.RAM
 			Task result = null;
 			foreach (var task in state.Tasks.GetOrAdd(typeof (T).FullName)
 					.OrderBy(x => x.Key)
-					.Select(rawTask => Task.ToTask(typeof (T).FullName, rawTask.Value)))
+					.Select(rawTask => Task.ToTask(typeof (T).FullName, rawTask.Value.Task)))
 			{
 				if (result == null)
 					result = task;

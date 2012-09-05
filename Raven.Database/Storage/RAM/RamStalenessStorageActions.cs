@@ -15,37 +15,35 @@ namespace Raven.Database.Storage.RAM
 
 		public bool IsIndexStale(string name, DateTime? cutOff, Guid? cutoffEtag)
 		{
-			var index = state.Indexes.GetOrDefault(name);
-			var indexStats = state.IndexesStats.GetOrDefault(name);
+			var indexStat = state.IndexesStats.GetOrDefault(name);
 
-			if (index == null || indexStats == null)
+			if (indexStat == null)
 				return false;
 
+			var indexStatReduce = state.IndexesReduceStats.GetOrDefault(name);
 
-			var hasReduce = index.IsMapReduce;
+			var hasReduce = indexStatReduce != null;
 
 			if (IsMapStale(name) || hasReduce && IsReduceStale(name))
 			{
 				if (cutOff != null)
 				{
-					var lastIndexedTimestamp = indexStats.LastIndexedTimestamp;
-
+					var lastIndexedTimestamp = indexStat.LastIndexedTimestamp;
 					if (cutOff.Value >= lastIndexedTimestamp)
 						return true;
 
 					if (hasReduce)
 					{
-						lastIndexedTimestamp =indexStats.LastReducedTimestamp ?? DateTime.MinValue;
-
+						lastIndexedTimestamp = indexStatReduce.LastIndexedTimestamp;
 						if (cutOff.Value >= lastIndexedTimestamp)
 							return true;
 					}
 				}
 				else if (cutoffEtag != null)
 				{
-					var lastIndexedEtag = indexStats.LastIndexedEtag;
+					var lastIndexedEtag = indexStat.LastIndexedEtag;
 
-					if (lastIndexedEtag.CompareTo(cutoffEtag.Value.ToByteArray()) < 0)
+					if (lastIndexedEtag.CompareTo(cutoffEtag) < 0)
 						return true;
 				}
 				else
@@ -54,61 +52,62 @@ namespace Raven.Database.Storage.RAM
 				}
 			}
 
-			return false;
+			var task = state.Tasks.GetOrDefault(name);
+
+			if (task == null)
+				return false;
+
+			var lastTask = task.OrderByDescending(pair => pair.Key).FirstOrDefault();
+
+			if (lastTask.Value == null)
+				return false;
+			
+			if (cutOff == null)
+				return true;
+
+			// we are at the first row for this index
+
+			var addedAt = lastTask.Value.AddedAt;
+			return cutOff.Value >= addedAt;
 		}
 
 		public bool IsReduceStale(string name)
 		{
 			return state.ScheduledReductions.Any(pair => pair.Key == name);
-
-			//Api.JetSetCurrentIndex(session, ScheduledReductions, "by_view");
-			//Api.MakeKey(session, ScheduledReductions, name, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			//return Api.TrySeek(session, ScheduledReductions, SeekGrbit.SeekEQ);
 		}
 
 		public bool IsMapStale(string name)
 		{
-			var index = state.IndexesStats.GetOrDefault(name);
+			var indexStat = state.IndexesStats.GetOrDefault(name);
 
-			if (index == null)
+			if (indexStat == null)
 				return false;
 
-			var lastIndexedEtag = index.LastIndexedEtag;
-
-			var lastEtag = state.Documents
-				.OrderByDescending(pair => pair.Value.Document.Etag)
-				.Select(pair => pair.Value.Document.Etag)
-				.FirstOrDefault();
-
-			if (lastEtag == null)
-				return false;
-
-			return ((Guid)lastEtag).CompareTo(lastIndexedEtag) > 0;
+			var lastIndexedEtag = indexStat.LastIndexedEtag;
+		
+			var lastEtag = (Guid)state.Documents.OrderByDescending(pair => pair.Value.Document.Etag).Select(pair => pair.Value.Document.Etag).FirstOrDefault();
+			return lastEtag.CompareTo(lastIndexedEtag) > 0;
 		}
 
 		public Tuple<DateTime, Guid> IndexLastUpdatedAt(string name)
 		{
-			var index = state.Indexes.GetOrDefault(name);
-			var indexStats = state.IndexesStats.GetOrDefault(name);
+			var indexStat = state.IndexesStats.GetOrDefault(name);
 
-			if (indexStats == null || index == null)
+			if (indexStat == null)
 				throw new IndexDoesNotExistsException("Could not find index named: " + name);
 
-			if (index.IsMapReduce)
+			var indexReduceStat = state.IndexesReduceStats.GetOrDefault(name);
+
+			if (indexReduceStat != null)
 			{// for map-reduce indexes, we use the reduce stats
 
-				var lastReducedIndex = indexStats.LastReducedTimestamp ?? DateTime.MinValue; 
-				if (indexStats.LastReducedEtag != null)
-				{
-					var lastReducedEtag = (Guid)indexStats.LastReducedEtag;
-
-					return Tuple.Create(lastReducedIndex, lastReducedEtag);
-				}
+				var lastReducedIndex = (DateTime) indexReduceStat.LastReducedTimestamp;
+				var lastReducedEtag = (Guid)indexReduceStat.LastReducedEtag;
+				return Tuple.Create(lastReducedIndex, lastReducedEtag);
 			}
 
-
-			var lastIndexedTimestamp = indexStats.LastIndexedTimestamp;
-			var lastIndexedEtag = indexStats.LastIndexedEtag;
+			var lastIndexedTimestamp = indexStat.LastIndexedTimestamp;
+			var lastIndexedEtag = indexStat.LastIndexedEtag;
 
 			return Tuple.Create(lastIndexedTimestamp, lastIndexedEtag);
 		}
