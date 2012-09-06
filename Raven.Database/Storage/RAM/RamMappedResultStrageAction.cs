@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Raven.Abstractions;
 using Raven.Database.Impl;
 using Raven.Database.Indexing;
@@ -73,17 +74,6 @@ namespace Raven.Database.Storage.RAM
 				return;
 
 			state.MappedResults.Remove(view);
-			//Api.MakeKey(session, MappedResults, view, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			//Api.JetSetIndexRange(session, MappedResults, SetIndexRangeGrbit.RangeUpperLimit | SetIndexRangeGrbit.RangeInclusive);
-
-			//do
-			//{
-			//	// esent index ranges are approximate, and we need to check them ourselves as well
-			//	var viewFromDb = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["view"]);
-			//	if (StringComparer.InvariantCultureIgnoreCase.Equals(viewFromDb, view) == false)
-			//		continue;
-			//	Api.JetDelete(session, MappedResults);
-			//} while (Api.TryMoveNext(session, MappedResults));
 		}
 
 		public IEnumerable<MappedResultInfo> GetMappedResultsReduceKeysAfter(string indexName, Guid lastReducedEtag, bool loadData, int take)
@@ -104,39 +94,12 @@ namespace Raven.Database.Storage.RAM
 					ReduceKey = key,
 					Etag = mappedResult.Value.Etag,
 					Timestamp = mappedResult.Value.Timestamp,
-					Data = loadData ? LoadMappedResults(key) : null,
+					Data = loadData ? mappedResult.Value.Data : null,
 					Size = mappedResult.Value.Size
 				};
 
 				results[mappedResultInfo.ReduceKey] = mappedResultInfo;
 			}
-
-			//while (
-			//	results.Count < take &&
-			//	Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["view"], Encoding.Unicode, RetrieveColumnGrbit.RetrieveFromIndex) == indexName)
-			//{
-			//	var key = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_key"]);
-			//	var mappedResultInfo = new MappedResultInfo
-			//	{
-			//		ReduceKey =
-			//			key,
-			//		Etag = new Guid(Api.RetrieveColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["etag"])),
-			//		Timestamp =
-			//			Api.RetrieveColumnAsDateTime(session, MappedResults, tableColumnsCache.MappedResultsColumns["timestamp"]).
-			//			Value,
-			//		Data = loadData
-			//				? LoadMappedResults(key)
-			//				: null,
-			//		Size = Api.RetrieveColumnSize(session, MappedResults, tableColumnsCache.MappedResultsColumns["data"]) ?? 0
-			//	};
-
-			//	results[mappedResultInfo.ReduceKey] = mappedResultInfo;
-
-			//	// the index is view ascending and etag descending
-			//	// that means that we are going backward to go up
-			//	if (Api.TryMovePrevious(session, MappedResults) == false)
-			//		break;
-			//}
 
 			return results.Values;
 		}
@@ -156,58 +119,113 @@ namespace Raven.Database.Storage.RAM
 					ReduceKey = key,
 					Etag = mappedResultsWrapper.MappedResultInfo.Etag,
 					Timestamp = mappedResultsWrapper.MappedResultInfo.Timestamp,
-					Data = LoadMappedResults(key),
+					Data = mappedResultsWrapper.MappedResultInfo.Data,
 					Size = mappedResultsWrapper.MappedResultInfo.Size,
 					Bucket = bucket,
 					Source = mappedResultsWrapper.DocumentKey
 				};
 			}
-
-			//while (take > 0)
-			//{
-			//	take -= 1;
-
-			//	var indexNameFromDb = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["view"], Encoding.Unicode, RetrieveColumnGrbit.RetrieveFromIndex);
-			//	var keyFromDb = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["reduce_key"]);
-			//	if (string.Equals(indexNameFromDb, indexName, StringComparison.InvariantCultureIgnoreCase) == false ||
-			//		string.Equals(key, keyFromDb, StringComparison.InvariantCultureIgnoreCase) == false)
-			//		break;
-
-			//	var bucket = Api.RetrieveColumnAsInt32(session, MappedResults, tableColumnsCache.MappedResultsColumns["bucket"]).Value;
-			//	yield return new MappedResultInfo
-			//	{
-			//		ReduceKey = keyFromDb,
-			//		Etag = new Guid(Api.RetrieveColumn(session, MappedResults, tableColumnsCache.MappedResultsColumns["etag"])),
-			//		Timestamp = Api.RetrieveColumnAsDateTime(session, MappedResults, tableColumnsCache.MappedResultsColumns["timestamp"]).Value,
-			//		Data = LoadMappedResults(keyFromDb),
-			//		Size = Api.RetrieveColumnSize(session, MappedResults, tableColumnsCache.MappedResultsColumns["data"]) ?? 0,
-			//		Bucket = bucket,
-			//		Source = Api.RetrieveColumnAsString(session, MappedResults, tableColumnsCache.MappedResultsColumns["document_key"], Encoding.Unicode)
-			//	};
-
-			//	if (Api.TryMoveNext(session, MappedResults) == false)
-			//		break;
-			//}
 		}
 
 		public IEnumerable<MappedResultInfo> GetReducedResultsForDebug(string indexName, string key, int level, int take)
 		{
-			throw new NotImplementedException();
+			var reducedResults = state.ReducedResults.GetOrDefault(indexName);
+			if(reducedResults == null)
+				yield break;
+
+			var resultsToDebug =
+				reducedResults.Where(wrapper => wrapper.MappedResultInfo.ReduceKey == key && wrapper.Level == level).Take(take).ToList();
+
+			foreach (var reducedResultsWrapper in resultsToDebug)
+			{
+				var levelFromDb = reducedResultsWrapper.Level;
+				var indexNameFromDb = reducedResultsWrapper.View;
+				var keyFromDb = reducedResultsWrapper.MappedResultInfo.ReduceKey;
+
+				if (string.Equals(indexNameFromDb, indexName, StringComparison.InvariantCultureIgnoreCase) == false ||
+					level != levelFromDb ||
+					string.Equals(key, keyFromDb, StringComparison.InvariantCultureIgnoreCase) == false)
+					break;
+
+				yield return new MappedResultInfo
+				{
+					ReduceKey = keyFromDb,
+					Etag = reducedResultsWrapper.MappedResultInfo.Etag,
+					Timestamp = reducedResultsWrapper.MappedResultInfo.Timestamp,
+					Data = reducedResultsWrapper.MappedResultInfo.Data,
+					Size = reducedResultsWrapper.MappedResultInfo.Size,
+					Bucket = reducedResultsWrapper.MappedResultInfo.Bucket,
+					Source = reducedResultsWrapper.SourceBucket
+				};
+			}
 		}
 
 		public void ScheduleReductions(string view, int level, IEnumerable<ReduceKeyAndBucket> reduceKeysAndBuckets)
 		{
-			throw new NotImplementedException();
+			foreach (var reduceKeysAndBukcet in reduceKeysAndBuckets)
+			{
+				var bucket = reduceKeysAndBukcet.Bucket;
+
+				var scheduledReductions = state.ScheduledReductions.GetOrAdd(view);
+
+				scheduledReductions.Add(new ScheduledReductionsWrapper
+				{
+					Level = level,
+					View = view,
+					ReduceKey = reduceKeysAndBukcet.ReduceKey,
+					SourceBucket = bucket,
+					ScheduledReductionInfo = new ScheduledReductionInfo
+					{
+						Etag = generator.CreateSequentialUuid(),
+						Timestamp = SystemTime.UtcNow
+					}
+				});
+			}
 		}
 
 		public IEnumerable<MappedResultInfo> GetItemsToReduce(string index, int level, int take, List<object> itemsToDelete)
 		{
-			throw new NotImplementedException();
+			var scheduledReductions = state.ScheduledReductions.GetOrDefault(index);
+			if (scheduledReductions == null)
+				yield break;
+
+			var scheduledReductionsToReduce = scheduledReductions.Where(wrapper => wrapper.Level == level).Take(take).ToList();
+
+			var seen = new HashSet<Tuple<string, int>>();
+
+			foreach (var reductionsWrapper in scheduledReductionsToReduce)
+			{
+				var indexFromDb = reductionsWrapper.View;
+				var levelFromDb = reductionsWrapper.Level;
+
+				if (string.Equals(index, indexFromDb, StringComparison.InvariantCultureIgnoreCase) == false ||
+					levelFromDb != level)
+					break;
+
+				var reduceKey = reductionsWrapper.ReduceKey;
+				var bucket = reductionsWrapper.SourceBucket;
+
+				if (seen.Add(Tuple.Create(reduceKey, bucket)))
+				{
+					foreach (var mappedResultInfo in GetResultsForBucket(index, level, reduceKey, bucket))
+					{
+						take--;
+						yield return mappedResultInfo;
+					}
+				}
+			}
 		}
 
 		public ScheduledReductionInfo DeleteScheduledReduction(List<object> itemsToDelete)
 		{
-			throw new NotImplementedException();
+			//TODO: check
+			foreach (var item in itemsToDelete)
+			{
+				state.ScheduledReductions.Remove(item.ToString());
+
+			}
+
+			return null;
 		}
 
 		public void PutReducedResult(string view, string reduceKey, int level, int sourceBucket, int bucket, RavenJObject data)
@@ -228,43 +246,147 @@ namespace Raven.Database.Storage.RAM
 					Timestamp = SystemTime.UtcNow
 				},
 				Level = level,
-				SourceBucket = sourceBucket
+				SourceBucket = sourceBucket.ToString(CultureInfo.InvariantCulture)
 			});
 		}
 
 		public void RemoveReduceResults(string indexName, int level, string reduceKey, int sourceBucket)
 		{
-			var reducedResults = state.MappedResults.Select(pair => pair.Value.Where
-				                                                        (wrapper => wrapper.Level == level &&
-				                                                                    wrapper.SourceBucket == sourceBucket &&
-				                                                                    wrapper.MappedResultInfo.ReduceKey == reduceKey)).ToList();
+			var reducedResults = state.ReducedResults.GetOrDefault(indexName);
+			if (reducedResults == null)
+				return;
+			var resultsToRemove =
+				reducedResults.Where(
+					wrapper =>
+					wrapper.Level == level && wrapper.MappedResultInfo.ReduceKey == reduceKey && wrapper.SourceBucket == sourceBucket.ToString(CultureInfo.InvariantCulture)).ToList();
 
-			if (reducedResults.Count == 0)
+			if (!resultsToRemove.Any())
 				return;
 
-			foreach (var reducedResult in reducedResults)
+			foreach (var reducedResultsWrapper in resultsToRemove)
 			{
-				//delete
+				state.ReducedResults.GetOrDefault(indexName).Remove(reducedResultsWrapper);
 			}
-			Api.JetSetCurrentIndex(session, ReducedResults, "by_view_level_reduce_key_and_source_bucket");
-			Api.MakeKey(session, ReducedResults, indexName, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			Api.MakeKey(session, ReducedResults, level, MakeKeyGrbit.None);
-			Api.MakeKey(session, ReducedResults, reduceKey, Encoding.Unicode, MakeKeyGrbit.None);
-			Api.MakeKey(session, ReducedResults, sourceBucket, MakeKeyGrbit.None);
 
-			if (Api.TrySeek(session, ReducedResults, SeekGrbit.SeekEQ) == false)
-				return;
-
-			Api.MakeKey(session, ReducedResults, indexName, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			Api.MakeKey(session, ReducedResults, level, MakeKeyGrbit.None);
-			Api.MakeKey(session, ReducedResults, reduceKey, Encoding.Unicode, MakeKeyGrbit.None);
-			Api.MakeKey(session, ReducedResults, sourceBucket, MakeKeyGrbit.None);
-			Api.JetSetIndexRange(session, ReducedResults, SetIndexRangeGrbit.RangeUpperLimit | SetIndexRangeGrbit.RangeInclusive);
-
-			do
+			if(!state.ReducedResults.GetOrDefault(indexName).Any())
 			{
-				Api.JetDelete(session, ReducedResults);
-			} while (Api.TryMoveNext(session, ReducedResults));
+				state.ReducedResults.Remove(indexName);
+			}
+		}
+
+		private IEnumerable<MappedResultInfo> GetResultsForBucket(string index, int level, string reduceKey, int bucket)
+		{
+			switch (level)
+			{
+				case 0:
+					return GetMappedResultsForBucket(index, reduceKey, bucket);
+				case 1:
+				case 2:
+					return GetReducedResultsForBucket(index, reduceKey, level, bucket);
+				default:
+					throw new ArgumentException("Invalid level: " + level);
+			}
+		}
+
+		private IEnumerable<MappedResultInfo> GetMappedResultsForBucket(string index, string reduceKey, int bucket)
+		{
+			var mappedResults = state.MappedResults.GetOrDefault(index);
+			if(mappedResults == null)
+			{
+				yield return new MappedResultInfo
+				{
+					ReduceKey = reduceKey,
+					Bucket = bucket
+				};
+				yield break;
+			}
+
+			var mappedResultsForBucket =
+				mappedResults.Where(wrapper => wrapper.MappedResultInfo.ReduceKey == reduceKey
+				                               && wrapper.MappedResultInfo.Bucket == bucket)
+					.ToList();
+
+			if (mappedResultsForBucket.Count == 0)
+			{
+				yield return new MappedResultInfo
+				{
+					ReduceKey = reduceKey,
+					Bucket = bucket
+				};
+				yield break;
+			}
+
+			foreach (var mappedResultsWrapper in mappedResultsForBucket)
+			{
+				var indexFromDb = mappedResultsWrapper.View;
+				var keyFromDb = mappedResultsWrapper.MappedResultInfo.ReduceKey;
+				var bucketFromDb = mappedResultsWrapper.MappedResultInfo.Bucket;
+
+				if (string.Equals(indexFromDb, index, StringComparison.InvariantCultureIgnoreCase) == false ||
+					string.Equals(keyFromDb, reduceKey, StringComparison.InvariantCultureIgnoreCase) == false ||
+					bucketFromDb != bucket)
+					break;
+
+				yield return new MappedResultInfo
+				{
+					Bucket = bucket,
+					ReduceKey = keyFromDb,
+					Etag = mappedResultsWrapper.MappedResultInfo.Etag,
+					Timestamp = mappedResultsWrapper.MappedResultInfo.Timestamp,
+					Data = mappedResultsWrapper.MappedResultInfo.Data,
+					Size = mappedResultsWrapper.MappedResultInfo.Size
+				};
+			}
+		}
+
+		private IEnumerable<MappedResultInfo> GetReducedResultsForBucket(string index, string reduceKey, int level, int bucket)
+		{
+			var reducedResults = state.ReducedResults.GetOrDefault(index);
+			if(reducedResults == null)
+			{
+				yield return new MappedResultInfo
+				{
+					Bucket = bucket,
+					ReduceKey = reduceKey,
+				};
+				yield break;
+			}
+
+			var reduceResultsForBucket = reducedResults.Where(wrapper => wrapper.Level == level
+			                                                             && wrapper.View == index
+			                                                             && wrapper.MappedResultInfo.ReduceKey == reduceKey
+			                                                             && wrapper.MappedResultInfo.Bucket == bucket)
+				.ToList();
+
+			if (reduceResultsForBucket.Count == 0)
+			{
+				yield return new MappedResultInfo
+				{
+					Bucket = bucket,
+					ReduceKey = reduceKey,
+				};
+				yield break;
+			}
+
+
+			foreach (var reducedResultsWrapper in reduceResultsForBucket)
+			{
+				var key = reducedResultsWrapper.MappedResultInfo.ReduceKey;
+				var bucketFromDb = reducedResultsWrapper.MappedResultInfo.Bucket;
+				if (string.Equals(key, reduceKey, StringComparison.InvariantCultureIgnoreCase) == false ||
+					bucketFromDb != bucket)
+					break;
+
+				yield return new MappedResultInfo
+				{
+					Bucket = bucket,
+					ReduceKey = key,
+					Etag = reducedResultsWrapper.MappedResultInfo.Etag,
+					Timestamp = reducedResultsWrapper.MappedResultInfo.Timestamp,
+					Data = reducedResultsWrapper.MappedResultInfo.Data,
+					Size = reducedResultsWrapper.MappedResultInfo.Size
+				};
+			}
 		}
 	}
 }

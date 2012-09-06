@@ -18,8 +18,9 @@ namespace Raven.Database.Storage.RAM
 		public TransactionalDictionary<Guid, Transaction> Transactions { get; private set; }
 		public TransactionalDictionary<string, IndexStats> IndexesStats { get; private set; }
 		public TransactionalDictionary<string, IndexStats> IndexesReduceStats { get; private set; }
-		public TransactionalDictionary<string,TransactionalList<MappedResultsWrapper>> MappedResults { get; private set; }
-		public TransactionalDictionary<string, TransactionalList<ScheduledReductionInfo>> ScheduledReductions { get; private set; }
+		public TransactionalDictionary<string, TransactionalList<MappedResultsWrapper>> MappedResults { get; private set; }
+		public TransactionalDictionary<string, TransactionalList<ReducedResultsWrapper>> ReducedResults { get; private set; }
+		public TransactionalDictionary<string, TransactionalList<ScheduledReductionsWrapper>> ScheduledReductions { get; private set; }
 		public TransactionalDictionary<string, int> IndexesEtag { get; private set; } 
 
 		public RamState()
@@ -43,8 +44,11 @@ namespace Raven.Database.Storage.RAM
 			MappedResults = new TransactionalDictionary<string, TransactionalList<MappedResultsWrapper>>(StringComparer.InvariantCultureIgnoreCase,
 				() => new TransactionalList<MappedResultsWrapper>());
 
-			ScheduledReductions = new TransactionalDictionary<string, TransactionalList<ScheduledReductionInfo>>(StringComparer.InvariantCultureIgnoreCase,
-				() => new TransactionalList<ScheduledReductionInfo>());
+			ReducedResults = new TransactionalDictionary<string, TransactionalList<ReducedResultsWrapper>>(StringComparer.InvariantCultureIgnoreCase,
+				() => new TransactionalList<ReducedResultsWrapper>());
+
+			ScheduledReductions = new TransactionalDictionary<string, TransactionalList<ScheduledReductionsWrapper>>(StringComparer.InvariantCultureIgnoreCase,
+				() => new TransactionalList<ScheduledReductionsWrapper>());
 
 			Lists = new TransactionalDictionary<string, TransactionalDictionary<string, ListItem>>(StringComparer.InvariantCultureIgnoreCase,
 					() => new TransactionalDictionary<string, ListItem>(StringComparer.InvariantCultureIgnoreCase));
@@ -85,7 +89,25 @@ namespace Raven.Database.Storage.RAM
 		public string View { get; set; }
 		public string DocumentKey { get; set; }
 		public int Level { get; set; }
+		public string SourceBucket { get; set; }
+	}
+
+	public class ReducedResultsWrapper
+	{
+		public MappedResultInfo MappedResultInfo { get; set; }
+		public string View { get; set; }
+		public int Level { get; set; }
+		public string SourceBucket { get; set; }
+	}
+
+	public class ScheduledReductionsWrapper
+	{
+		public ScheduledReductionInfo ScheduledReductionInfo { get; set; }
+		public int Level { get; set; }
+		public string View { get; set; }
+		public string ReduceKey { get; set; }
 		public int SourceBucket { get; set; }
+
 	}
 
 	public class TaskWrapper

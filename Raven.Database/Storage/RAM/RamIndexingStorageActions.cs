@@ -19,7 +19,7 @@ namespace Raven.Database.Storage.RAM
 
 		public void Dispose()
 		{
-			throw new NotImplementedException();
+			
 		}
 
 		public IEnumerable<IndexStats> GetIndexesStats()
@@ -63,28 +63,9 @@ namespace Raven.Database.Storage.RAM
 			if (indexReduceStat != null)
 				state.IndexesReduceStats.Remove(name);
 
-			//TODO: remove from results
-			//foreach (var table in new[] { MappedResults, ReducedResults, ScheduledReductions })
-			//{
-			//	Api.JetSetCurrentIndex(session, table, "by_view");
-			//	Api.MakeKey(session, table, name, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			//	if (!Api.TrySeek(session, table, SeekGrbit.SeekEQ))
-			//		continue;
-
-			//	Api.MakeKey(session, table, name, Encoding.Unicode, MakeKeyGrbit.NewKey);
-			//	Api.JetSetIndexRange(session, table, SetIndexRangeGrbit.RangeInclusive | SetIndexRangeGrbit.RangeUpperLimit);
-			//	var count = 0;
-			//	do
-			//	{
-			//		if (count++ > 1000)
-			//		{
-			//			PulseTransaction();
-			//			count = 0;
-			//		}
-
-			//		Api.JetDelete(session, table);
-			//	} while (Api.TryMoveNext(session, table));
-			//}
+			state.MappedResults.Remove(name);
+			state.ReducedResults.Remove(name);
+			state.ScheduledReductions.Remove(name);
 		}
 
 		public IndexFailureInformation GetFailureRate(string index)
