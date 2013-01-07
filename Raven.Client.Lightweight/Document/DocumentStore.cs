@@ -173,7 +173,7 @@ namespace Raven.Client.Document
 		/// </summary>
 		public string ApiKey { get; set; }
 
-#if !SILVERLIGHT
+#if !SILVERLIGHT && !MONO
 		private string connectionStringName;
 
 		/// <summary>
@@ -228,6 +228,7 @@ namespace Raven.Client.Document
 			connectionStringOptions.Parse();
 			return connectionStringOptions.ConnectionStringOptions;
 		}
+
 #endif
 
 		/// <summary>

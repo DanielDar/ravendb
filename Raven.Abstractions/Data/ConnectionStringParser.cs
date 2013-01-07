@@ -50,12 +50,16 @@ namespace Raven.Abstractions.Data
 	{
 		public static ConnectionStringParser<TConnectionString> FromConnectionStringName(string connectionStringName)
 		{
+#if !MONO
 			var connectionStringSettings = ConfigurationManager.ConnectionStrings[connectionStringName];
 			if (connectionStringSettings == null)
 				throw new ArgumentException(string.Format("Could not find connection string name: '{0}'", connectionStringName));
 
 		
 			return new ConnectionStringParser<TConnectionString>(connectionStringName, connectionStringSettings.ConnectionString);
+#else
+				throw new ArgumentException(string.Format("Could not find connection string name: '{0}'", connectionStringName));
+#endif
 		}
 
 		public static ConnectionStringParser<TConnectionString> FromConnectionString(string connectionString)
@@ -106,7 +110,11 @@ namespace Raven.Abstractions.Data
 						goto default;
 					bool result;
 					if (bool.TryParse(value, out result) == false)
+#if !MONO
 						throw new ConfigurationErrorsException(string.Format("Could not understand memory setting: '{0}'", value));
+#else
+						throw new Exception(string.Format("Could not understand memory setting: '{0}'", value)); 
+#endif
 					embeddedRavenConnectionStringOptions.RunInMemory = result;
 					break;
 				case "datadir":
