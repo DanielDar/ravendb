@@ -647,7 +647,7 @@ namespace Raven.Client.Connection.Async
 			return request.ReadResponseJsonAsync()
 				.ContinueWith(task => convention.CreateSerializer().Deserialize<BuildNumber>(new RavenJTokenReader(task.Result)));
 		}
-
+#if !MONO
 		public async Task<LicensingStatus> GetLicenseStatus()
 		{
 			var actualUrl = string.Format("{0}/license/status", url).NoCache();
@@ -679,6 +679,7 @@ namespace Raven.Client.Connection.Async
 			};
 		}
 
+#endif
 		public Task StartBackupAsync(string backupLocation, DatabaseDocument databaseDocument)
 		{
 			var request = jsonRequestFactory.CreateHttpJsonRequest(new CreateHttpJsonRequestParams(this, (url + "/admin/backup").NoCache(), "POST", credentials, convention));

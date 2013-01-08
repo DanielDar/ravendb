@@ -9,7 +9,11 @@ namespace Raven.Abstractions.Data
 	{
 		public RavenConnectionStringOptions()
 		{
+#if MONO
+			EnlistInDistributedTransactions = false;
+#else
 			EnlistInDistributedTransactions = true;
+#endif
 		}
 
 		public NetworkCredential Credentials { get; set; }
@@ -124,7 +128,11 @@ namespace Raven.Abstractions.Data
 					embeddedRavenConnectionStringOptions.DataDirectory = value;
 					break;
 				case "enlist":
+#if MONO
+					ConnectionStringOptions.EnlistInDistributedTransactions = false;
+#else
 					ConnectionStringOptions.EnlistInDistributedTransactions = bool.Parse(value);
+#endif
 					break;
 				case "resourcemanagerid":
 					ConnectionStringOptions.ResourceManagerId = new Guid(value);
