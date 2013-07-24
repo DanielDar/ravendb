@@ -22,7 +22,7 @@ namespace Raven.Web
 
 		public void ProcessRequest(HttpContext context)
 		{
-			server.HandleActualRequest(new HttpContextAdapter(context, server.Configuration));
+			server.HandleActualRequest(new HttpContextAdapter(context, server.SystemConfiguration));
 		}
 
 		public bool IsReusable

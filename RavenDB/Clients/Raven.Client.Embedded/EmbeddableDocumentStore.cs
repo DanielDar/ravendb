@@ -13,6 +13,7 @@ using Raven.Client.Embedded.Changes;
 using Raven.Database;
 using Raven.Database.Config;
 using Raven.Database.Server;
+using Raven.Database.Server.WebApi;
 using Raven.Json.Linq;
 
 namespace Raven.Client.Embedded
@@ -31,7 +32,8 @@ namespace Raven.Client.Embedded
 		}
 
 		private RavenConfiguration configuration;
-		private HttpServer httpServer;
+		// private HttpServer httpServer;
+		private WebApiServer webApiServer;
 		private bool wasDisposed;
 
 		/// <summary>
@@ -158,8 +160,8 @@ namespace Raven.Client.Embedded
 				idleTimer.Dispose();
 			if (DocumentDatabase != null)
 				DocumentDatabase.Dispose();
-			if (httpServer != null)
-				httpServer.Dispose();
+			if (webApiServer != null)
+				webApiServer.Dispose();
 
 
 			var onDisposed = Disposed;
@@ -220,8 +222,8 @@ namespace Raven.Client.Embedded
 				if (UseEmbeddedHttpServer)
 				{
 					SetStudioConfigToAllowSingleDb();
-					httpServer = new HttpServer(configuration, DocumentDatabase);
-					httpServer.StartListening();
+					webApiServer = new WebApiServer(configuration, DocumentDatabase);
+					webApiServer.StartListening();
 				}
 				else // we need to setup our own idle timer
 				{
@@ -286,12 +288,20 @@ namespace Raven.Client.Embedded
 		}
 
 
+		///// <summary>
+		///// Expose the internal http server, if used
+		///// </summary>
+		//public HttpServer HttpServer
+		//{
+		//	get { return httpServer; }
+		//}
+
 		/// <summary>
 		/// Expose the internal http server, if used
 		/// </summary>
-		public HttpServer HttpServer
+		public WebApiServer WebApiServer
 		{
-			get { return httpServer; }
+			get { return webApiServer; }
 		}
 
 		///<summary>

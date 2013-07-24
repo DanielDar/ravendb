@@ -24,7 +24,7 @@ namespace Raven.Web
 		public Task ProcessRequestAsync(HttpContext context)
 		{
 			var tcs = new TaskCompletionSource<object>();
-			server.HandleChangesRequest(new HttpContextAdapter(HttpContext.Current, server.Configuration), ()=> tcs.TrySetResult(null))
+			server.HandleChangesRequest(new HttpContextAdapter(HttpContext.Current, server.SystemConfiguration), ()=> tcs.TrySetResult(null))
 				.ContinueWith(task =>
 				              	{
 				              		if(task.IsFaulted)
