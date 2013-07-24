@@ -1,18 +1,18 @@
-﻿using System.Web.Http;
+﻿using System.Net.Http;
+using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
 	public class BuildController : RavenApiController
 	{
 		[HttpGet]
-		public object Version()
+		public HttpResponseMessage Version()
 		{
-			return new
+			return GetMessageWithObject(new
 			{
-				ProductVersion = "abc",
-				BuildVersion = "1234",
-				DatabaseName = DatabaseName
-			};
+				DocumentDatabase.ProductVersion,
+				DocumentDatabase.BuildVersion
+			});
 		}
 	}
 }

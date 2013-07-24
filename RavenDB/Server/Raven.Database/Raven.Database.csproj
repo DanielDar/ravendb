@@ -241,6 +241,7 @@
     <Compile Include="Server\Controllers\DatabasesController.cs" />
     <Compile Include="Server\Controllers\DebugController.cs" />
     <Compile Include="Server\Controllers\DocumentsController.cs" />
+    <Compile Include="Server\Controllers\IndexController.cs" />
     <Compile Include="Server\Responders\TransactionPrepare.cs" />
     <Compile Include="Server\Security\Authentication.cs" />
     <Compile Include="Server\Security\AuthenticationForCommercialUseOnly.cs" />

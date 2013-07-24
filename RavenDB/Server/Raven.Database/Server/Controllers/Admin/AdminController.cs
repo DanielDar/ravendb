@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Net.Http.Formatting;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
@@ -12,7 +13,7 @@ namespace Raven.Database.Server.Controllers.Admin
 	public class AdminController : BaseAdminController
 	{
 		[HttpPost("backup")]
-		public async Task<object> Backup()
+		public async Task<HttpResponseMessage> Backup()
 		{
 			var backupRequest = await ReadJsonObjectAsync<BackupRequest>();
 			var incrementalString = Request.RequestUri.ParseQueryString()["incremental"];
@@ -25,38 +26,40 @@ namespace Raven.Database.Server.Controllers.Admin
 		}
 
 		[HttpGet("changedbid")]
-		public object ChangeDbId()
+		public HttpResponseMessage ChangeDbId()
 		{
 			Guid old = Database.TransactionalStorage.Id;
 			var newId = Database.TransactionalStorage.ChangeId();
 
-			return new
+			return GetMessageWithObject(new
 			{
 				OldId = old,
 				NewId = newId
-			};
+			});
 		}
 
 		[HttpGet("compact")]
-		public void Compact()
+		public HttpResponseMessage Compact()
 		{
 			EnsureSystemDatabase();
 				
 			var db = Request.RequestUri.ParseQueryString()["database"];
-			if(string.IsNullOrWhiteSpace(db))
-				throw new HttpException(400, "Compact request requires a valid database parameter");
+			if (string.IsNullOrWhiteSpace(db))
+				return GetMessageWithString("Compact request requires a valid database parameter", HttpStatusCode.BadRequest);
 
 			var configuration = DatabasesLandlord.CreateTenantConfiguration(db);
 			if (configuration == null)
-				throw new HttpException(404, "No database named: " + db);
+				return GetMessageWithString("No database named: " + db, HttpStatusCode.NotFound);
 
 			DatabasesLandlord.LockDatabase(db, () => DatabasesLandlord.SystemDatabase.TransactionalStorage.Compact(configuration));
+
+			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
 		[HttpGet("indexingStatus")]
-		public object IndexingStatus()
+		public HttpResponseMessage IndexingStatus()
 		{
-			return new { IndexingStatus = Database.WorkContext.RunIndexing ? "Indexing" : "Paused" };			
+			return GetMessageWithObject(new {IndexingStatus = Database.WorkContext.RunIndexing ? "Indexing" : "Paused"});		
 		}
 
 		[HttpGet("optimize")]
@@ -85,12 +88,12 @@ namespace Raven.Database.Server.Controllers.Admin
 		}
 
 		[HttpGet("stats")]
-		public object Stats()
+		public HttpResponseMessage Stats()
 		{
 			if (Database != DatabasesLandlord.SystemDatabase)
-				throw new HttpException(404, "Admin stats can only be had from the root database");
+				return GetMessageWithString("Admin stats can only be had from the root database", HttpStatusCode.NotFound);
 
-			return DatabasesLandlord.SystemDatabase.Statistics;
+			return GetMessageWithObject(DatabasesLandlord.SystemDatabase.Statistics);
 		}
 
 		[HttpGet("gc")]

@@ -11,22 +11,22 @@ namespace Raven.Database.Server.Controllers
 	public class DebugController :RavenApiController
 	{
 		[HttpGet]
-		public object Config()
+		public HttpResponseMessage Config()
 		{
 			var cfg = Database.Configuration;
 			//cfg["OAuthTokenKey"] = "<not shown>";
 
-			return cfg;
+			return GetMessageWithObject(cfg);
 		}
 
 		[HttpGet]
-		public object Changes()
+		public HttpResponseMessage Changes()
 		{
-			return Database.TransportState.DebugStatuses;
+			return GetMessageWithObject(Database.TransportState.DebugStatuses);
 		}
 
 		[HttpGet]
-		public object Docrefs(string id)
+		public HttpResponseMessage Docrefs(string id)
 		{
 			var totalCount = -1;
 			List<string> results = null;
@@ -40,15 +40,15 @@ namespace Raven.Database.Server.Controllers
 					        .ToList();
 			});
 
-			return new
+			return GetMessageWithObject(new
 			{
 				TotalCount = totalCount,
 				Results = results
-			};
+			});
 		}
 
 		[HttpGet]
-		public object List(string id)
+		public HttpResponseMessage List(string id)
 		{
 			var listName = id;
 			var key = Request.RequestUri.ParseQueryString()["key"];
@@ -67,7 +67,7 @@ namespace Raven.Database.Server.Controllers
 			if(listItem == null)
 				throw new HttpException(400, "Not found");
 				
-			return listItem;
+			return GetMessageWithObject(listItem);
 		}
 	}
 }

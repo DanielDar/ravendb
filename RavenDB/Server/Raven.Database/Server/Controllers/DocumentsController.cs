@@ -14,10 +14,10 @@ namespace Raven.Database.Server.Controllers
 	public class DocumentsController : RavenApiController
 	{
 		[HttpGet("docs")]
-		public object DocsGet()
+		public HttpResponseMessage DocsGet()
 		{
 			long documentsCount = 0;
-			Etag lastDocEtag = Etag.Empty;
+			var lastDocEtag = Etag.Empty;
 			Database.TransactionalStorage.Batch(accessor =>
 			{
 				lastDocEtag = accessor.Staleness.GetMostRecentDocumentEtag();
@@ -27,24 +27,21 @@ namespace Raven.Database.Server.Controllers
 			lastDocEtag = lastDocEtag.HashWith(BitConverter.GetBytes(documentsCount));
 			if (MatchEtag(lastDocEtag))
 			{
-				return null;
-				//context.SetStatusToNotModified();
+				return new HttpResponseMessage(HttpStatusCode.NotModified);
 			}
-			else
-			{
-				//context.WriteHeaders(new RavenJObject(), lastDocEtag);
 
-				var startsWith = GetQueryString("startsWith");
-				if (string.IsNullOrEmpty(startsWith))
-					return Database.GetDocuments(GetStart(), GetPageSize(Database.Configuration.MaxPageSize), GetEtagFromQueryString());
-				else
-					return Database.GetDocumentsWithIdStartingWith(startsWith, GetQueryString("matches"), GetStart(),
-					                                               GetPageSize(Database.Configuration.MaxPageSize));
-			}
+			//TODO: write headers
+			//WriteHeaders(new RavenJObject(), lastDocEtag);
+
+			var startsWith = GetQueryStringValue("startsWith");
+			if (string.IsNullOrEmpty(startsWith))
+				return GetMessageWithObject(Database.GetDocuments(GetStart(), GetPageSize(Database.Configuration.MaxPageSize), GetEtagFromQueryString()));
+			return GetMessageWithObject(Database.GetDocumentsWithIdStartingWith(startsWith, GetQueryStringValue("matches"),
+			                                                                    GetStart(), GetPageSize(Database.Configuration.MaxPageSize)));
 		}
 
 		[HttpPost("docs")]
-		public async Task<object> DocsPut()
+		public async Task<HttpResponseMessage> DocsPut()
 		{
 			var json = await ReadJsonAsync();
 			var id = Database.Put(null, Etag.Empty, json,
@@ -52,7 +49,7 @@ namespace Raven.Database.Server.Controllers
 								  GetRequestTransaction());
 
 			
-			return id;
+			return GetMessageWithObject(id);
 		}
 	}
 }

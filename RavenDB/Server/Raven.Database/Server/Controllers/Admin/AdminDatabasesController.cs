@@ -1,4 +1,5 @@
-﻿using System.Net.Http;
+﻿using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Http;
@@ -13,18 +14,18 @@ namespace Raven.Database.Server.Controllers.Admin
 	public class AdminDatabasesController : BaseAdminController
 	{
 		[HttpGet("databases/{id}")]
-		public object DatabasesGet(string id)
+		public HttpResponseMessage DatabasesGet(string id)
 		{
 			var docKey = "Raven/Databases/" + id;
 
 			var document = Database.Get(docKey, null);
 			if (document == null)
-				throw new HttpException(404, "Database " + id + " not found");
+				return GetMessageWithString("Database " + id + " not found", HttpStatusCode.NotFound);
 
 			var dbDoc = document.DataAsJson.JsonDeserialization<DatabaseDocument>();
 			dbDoc.Id = id;
 			DatabasesLandlord.Unprotect(dbDoc);
-			return dbDoc;
+			return GetMessageWithObject(dbDoc);
 		}
 
 		[HttpPut("databases/{id}")]

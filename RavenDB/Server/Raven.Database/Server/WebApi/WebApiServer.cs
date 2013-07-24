@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Dispatcher;
@@ -65,6 +66,31 @@ namespace Raven.Database.Server.WebApi
 		public Task StartListening()
 		{
 			return server.OpenAsync();
+		}
+
+		public void ResetNumberOfRequests()
+		{
+			//TODO: implement method
+//			Interlocked.Exchange(ref reqNum, 0);
+//			Interlocked.Exchange(ref physicalRequestsCount, 0);
+//#if DEBUG
+//			while (recentRequests.Count > 0)
+//			{
+//				string _;
+//				recentRequests.TryDequeue(out _);
+//			}
+//#endif
+		}
+
+		private int physicalRequestsCount;
+		public int NumberOfRequests
+		{
+			get { return Thread.VolatileRead(ref physicalRequestsCount); }
+		}
+
+		public Task<DocumentDatabase> GetDatabaseInternal(string name)
+		{
+			return databasesLandlord.GetDatabaseInternal(name);
 		}
 
 		internal class MyAssemblyResolver : IAssembliesResolver
