@@ -41,11 +41,16 @@ namespace Raven.Database.Server.WebApi
 			//	"With Id", "{controller}/{action}/{id}",
 			//	new { id = RouteParameter.Optional });
 
-			//config.Routes.MapHttpRoute(
-			//	"Database Route", "databases/{databaseName}/{controller}/{action}",
-			//	new { id = RouteParameter.Optional });
+			config.Routes.MapHttpRoute(
+				"Database Route", "databases/{databaseName}/{controller}/{action}",
+				new { id = RouteParameter.Optional });
 
 			server = new HttpSelfHostServer(config);			
+		}
+
+		public bool HasPendingRequests
+		{
+			get { return false; }//TODO: fix
 		}
 
 		public void Dispose()

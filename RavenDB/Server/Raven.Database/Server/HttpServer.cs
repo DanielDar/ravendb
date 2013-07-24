@@ -25,6 +25,7 @@ using Raven.Abstractions.Util;
 using Raven.Database.Commercial;
 using Raven.Database.Plugins;
 using Raven.Database.Server.Connections;
+using Raven.Database.Server.Controllers;
 using Raven.Database.Server.Responders;
 using Raven.Database.Server.Tenancy;
 using Raven.Database.Util;
@@ -207,11 +208,11 @@ namespace Raven.Database.Server
 								documentDatabase.Database.WorkContext.LastWorkTime
 							}.Max(),
 							TransactionalStorageSize = transactionalStorageSize,
-							TransactionalStorageSizeHumaneSize = DatabaseSize.Humane(transactionalStorageSize),
+							TransactionalStorageSizeHumaneSize = DatabasesController.Humane(transactionalStorageSize),
 							IndexStorageSize = indexStorageSize,
-							IndexStorageHumaneSize = DatabaseSize.Humane(indexStorageSize),
+							IndexStorageHumaneSize = DatabasesController.Humane(indexStorageSize),
 							TotalDatabaseSize = totalDatabaseSize,
-							TotalDatabaseHumaneSize = DatabaseSize.Humane(totalDatabaseSize),
+							TotalDatabaseHumaneSize = DatabasesController.Humane(totalDatabaseSize),
 							CountOfDocuments = documentDatabase.Database.Statistics.CountOfDocuments,
 							RequestsPerSecond = Math.Round(documentDatabase.Database.WorkContext.RequestsPerSecond, 2),
 							ConcurrentRequests = documentDatabase.Database.WorkContext.ConcurrentRequests,

@@ -25,6 +25,7 @@ using Raven.Abstractions.Logging;
 using Raven.Database;
 using Raven.Database.Config;
 using Raven.Database.Server;
+using Raven.Database.Server.Controllers.Admin;
 using Raven.Database.Server.Responders.Admin;
 using Raven.Database.Util;
 
@@ -504,7 +505,7 @@ Configuration options:
 					{
 						long before = Process.GetCurrentProcess().WorkingSet64;
 						Console.WriteLine("Starting garbage collection, current memory is: {0:#,#.##;;0} MB", before / 1024d / 1024d);
-						AdminGc.CollectGarbage(server.Database);
+						AdminController.CollectGarbage(server.Database);
 						var after = Process.GetCurrentProcess().WorkingSet64;
 						Console.WriteLine("Done garbage collection, current memory is: {0:#,#.##;;0} MB, saved: {1:#,#.##;;0} MB", after / 1024d / 1024d,
 											(before - after) / 1024d / 1024d);
