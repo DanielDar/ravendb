@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Formatting;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -18,13 +17,30 @@ using Raven.Abstractions.Indexing;
 using Raven.Database.Data;
 using Raven.Database.Queries;
 using Raven.Database.Server.Responders;
+using Raven.Database.Server.WebApi.Attributes;
 using Raven.Database.Storage;
+using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("Indexes")]
+	[RoutePrefix("indexes")]
+	[RoutePrefix("databases/{databaseName}/indexes")]
 	public class IndexController : RavenApiController
 	{
+		[HttpGet("")]
+		public HttpResponseMessage IndexesGet()
+		{
+			var namesOnlyString = GetQueryStringValue("namesOnly");
+			bool namesOnly;
+			RavenJArray indexes;
+			if (bool.TryParse(namesOnlyString, out namesOnly) && namesOnly)
+				indexes = Database.GetIndexNames(GetStart(), GetPageSize(Database.Configuration.MaxPageSize));
+			else
+				indexes = Database.GetIndexes(GetStart(), GetPageSize(Database.Configuration.MaxPageSize));
+
+			return GetMessageWithObject(indexes);
+		}
+
 		[HttpGet("{id}")]
 		public HttpResponseMessage IndexGet(string id)
 		{
@@ -70,6 +86,64 @@ namespace Raven.Database.Server.Controllers
 				}, HttpStatusCode.BadRequest);
 			}
 		}
+
+		[HttpHead("{id}")]
+		public HttpResponseMessage IndexHead(string id)
+		{
+			var index = id;
+			if (Database.IndexDefinitionStorage.IndexNames.Contains(index, StringComparer.OrdinalIgnoreCase) == false)
+				return GetMessageWithString("", HttpStatusCode.NotFound);
+			return new HttpResponseMessage(HttpStatusCode.OK);
+		}
+
+		[HttpPost("{id}")]
+		public HttpResponseMessage IndexPost(string id)
+		{
+			var index = id;
+			if ("forceWriteToDisk".Equals(GetQueryStringValue("op"), StringComparison.InvariantCultureIgnoreCase))
+			{
+				Database.IndexStorage.ForceWriteToDisk(index);
+				return new HttpResponseMessage(HttpStatusCode.OK);
+			}
+
+			if ("lockModeChange".Equals(GetQueryStringValue("op"), StringComparison.InvariantCultureIgnoreCase))
+				return HandleIndexLockModeChange(index);
+
+			return GetMessageWithString("Not idea how to handle a POST on " + index + " with op=" +
+			                            (GetQueryStringValue("op") ?? "<no val specified>"));
+		}
+
+		[HttpReset("{id}")]
+		public HttpResponseMessage IndexReset(string id)
+		{
+			var index = id;
+			Database.ResetIndex(index);
+			return GetMessageWithObject(new { Reset = index });
+		}
+
+		[HttpDelete("{id}")]
+		public HttpResponseMessage IndexDelete(string id)
+		{
+			var index = id;
+			Database.DeleteIndex(index);
+			return new HttpResponseMessage(HttpStatusCode.NoContent);
+		}
+
+		[HttpPost("{id}")]
+		public HttpResponseMessage IndexSetPriority(string id)
+		{
+			var index = id;
+			IndexingPriority indexingPriority;
+			if (Enum.TryParse(GetQueryStringValue("priority"), out indexingPriority) == false)
+			{
+				return GetMessageWithString("Could not parse priority value: " + GetQueryStringValue("priority"),
+					HttpStatusCode.BadRequest);
+			}
+
+			Database.TransactionalStorage.Batch(accessor => accessor.Indexing.SetIndexPriority(index, indexingPriority));
+			return new HttpResponseMessage(HttpStatusCode.OK);
+		}
+
 
 		private HttpResponseMessage GetIndexDefinition(string index)
 		{
@@ -471,6 +545,24 @@ namespace Raven.Database.Server.Controllers
 
 			var dynamicIndexName = Database.FindDynamicIndexName(entityName, indexQuery);
 			return dynamicIndexName;
+		}
+
+		private HttpResponseMessage HandleIndexLockModeChange(string index)
+		{
+			var lockModeStr = GetQueryStringValue("mode");
+
+			IndexLockMode indexLockMode;
+			if (Enum.TryParse(lockModeStr, out indexLockMode) == false)
+				return GetMessageWithString("Cannot understand index lock mode: " + lockModeStr, HttpStatusCode.BadRequest);
+
+			var indexDefinition = Database.IndexDefinitionStorage.GetIndexDefinition(index);
+			if (indexDefinition == null)
+				return GetMessageWithString("Cannot find index : " + index, HttpStatusCode.NotFound);
+			
+			var definition = indexDefinition.Clone();
+			definition.LockMode = indexLockMode;
+			Database.IndexDefinitionStorage.UpdateIndexDefinitionWithoutUpdatingCompiledIndex(definition);
+			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 	}
 }

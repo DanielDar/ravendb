@@ -5,12 +5,11 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Formatting;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Web;
 using System.Web.Http;
+using Lucene.Net.Search;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Extensions;
@@ -20,7 +19,6 @@ using Raven.Database.Server.Tenancy;
 using Raven.Database.Server.WebApi;
 using System.Linq;
 using Raven.Imports.Newtonsoft.Json;
-using Raven.Imports.Newtonsoft.Json.Linq;
 using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
@@ -68,6 +66,14 @@ namespace Raven.Database.Server.Controllers
 			using (var streamReader = new StreamReader(stream, GetRequestEncoding()))
 			using (var jsonReader = new RavenJsonTextReader(streamReader))
 				return RavenJObject.Load(jsonReader);
+		}
+
+		public async Task<RavenJArray> ReadJsonArrayAsync()
+		{
+			using (var stream = await Request.Content.ReadAsStreamAsync())
+			using (var streamReader = new StreamReader(stream, GetRequestEncoding()))
+			using (var jsonReader = new RavenJsonTextReader(streamReader))
+				return RavenJArray.Load(jsonReader);
 		}
 
 		private Encoding GetRequestEncoding()
@@ -395,6 +401,56 @@ namespace Raven.Database.Server.Controllers
 			{
 				Content = new StringContent(msg)
 			};
+		}
+
+		private static readonly Encoding DefaultEncoding = new UTF8Encoding(false);
+		public void WriteData(RavenJObject data, RavenJObject headers, Etag etag)
+		{
+			var str = data.ToString(Formatting.None);
+			var jsonp = GetQueryStringValue("jsonp");
+			if (string.IsNullOrEmpty(jsonp) == false)
+			{
+				str = jsonp + "(" + str + ");";
+				//TODO: header
+				//context.Response.AddHeader("Content-Type", "application/javascript; charset=utf-8");
+			}
+			else
+			{
+				//TODO: header
+				//context.Response.AddHeader("Content-Type", "application/json; charset=utf-8");
+			}
+			WriteData(DefaultEncoding.GetBytes(str), headers, etag);
+		}
+
+		public void WriteData(byte[] data, RavenJObject headers, Etag etag)
+		{
+			//TODO: header
+			//context.WriteHeaders(headers, etag);
+			//Response.OutputStream.Write(data, 0, data.Length);
+		}
+
+		public Etag GetEtag()
+		{
+			var etagAsString = GetHeader("If-None-Match") ?? GetHeader("If-Match");
+			if (etagAsString != null)
+			{
+				// etags are usually quoted
+				if (etagAsString.StartsWith("\"") && etagAsString.EndsWith("\""))
+					etagAsString = etagAsString.Substring(1, etagAsString.Length - 2);
+
+				Etag result;
+				if (Etag.TryParse(etagAsString, out result))
+					return result;
+				throw new BadRequestException("Could not parse If-None-Match or If-Match header as Guid");
+			}
+			return null;
+		}
+
+		private string GetHeader(string key)
+		{
+			if (Request.Headers.Contains(key) == false)
+				return null;
+			return Request.Headers.GetValues(key).FirstOrDefault();
 		}
 	}
 }
