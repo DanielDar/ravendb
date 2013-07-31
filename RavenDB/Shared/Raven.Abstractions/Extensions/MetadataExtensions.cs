@@ -244,7 +244,7 @@ namespace Raven.Abstractions.Extensions
 		}
 #endif
 
-		public static RavenJObject FilterHeadersAttachment(this HttpResponseHeaders self)
+		public static RavenJObject FilterHeadersAttachment(this HttpHeaders self)
 		{
 			var filterHeaders = self.FilterHeaders();
 

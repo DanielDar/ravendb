@@ -41,7 +41,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(indexes);
 		}
 
-		[HttpGet("{id}")]
+		[HttpGet("{*id}")]
 		public HttpResponseMessage IndexGet(string id)
 		{
 			var index = id;
@@ -60,7 +60,7 @@ namespace Raven.Database.Server.Controllers
 			return GetIndexQueryResult(index);
 		}
 
-		[HttpPut("{id}")]
+		[HttpPut("{*id}")]
 		public async Task<HttpResponseMessage> IndexPut(string id)
 		{
 			var index = id;
@@ -87,16 +87,16 @@ namespace Raven.Database.Server.Controllers
 			}
 		}
 
-		[HttpHead("{id}")]
+		[HttpHead("{*id}")]
 		public HttpResponseMessage IndexHead(string id)
 		{
 			var index = id;
 			if (Database.IndexDefinitionStorage.IndexNames.Contains(index, StringComparer.OrdinalIgnoreCase) == false)
-				return GetMessageWithString("", HttpStatusCode.NotFound);
+				return GetMessageWithString("Index " + id + " not found" , HttpStatusCode.NotFound);
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
-		[HttpPost("{id}")]
+		[HttpPost("{*id}")]
 		public HttpResponseMessage IndexPost(string id)
 		{
 			var index = id;
@@ -113,7 +113,7 @@ namespace Raven.Database.Server.Controllers
 			                            (GetQueryStringValue("op") ?? "<no val specified>"));
 		}
 
-		[HttpReset("{id}")]
+		[HttpReset("{*id}")]
 		public HttpResponseMessage IndexReset(string id)
 		{
 			var index = id;
@@ -121,7 +121,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(new { Reset = index });
 		}
 
-		[HttpDelete("{id}")]
+		[HttpDelete("{*id}")]
 		public HttpResponseMessage IndexDelete(string id)
 		{
 			var index = id;
@@ -129,7 +129,7 @@ namespace Raven.Database.Server.Controllers
 			return new HttpResponseMessage(HttpStatusCode.NoContent);
 		}
 
-		[HttpPost("{id}")]
+		[HttpPost("{*id}")]
 		public HttpResponseMessage IndexSetPriority(string id)
 		{
 			var index = id;
@@ -249,6 +249,7 @@ namespace Raven.Database.Server.Controllers
 
 			sp.Stop();
 
+			//TODO: log
 			//context.Log(log => log.Debug(() =>
 			//{
 			//	var sb = new StringBuilder("\tQuery: ")
@@ -484,7 +485,6 @@ namespace Raven.Database.Server.Controllers
 			if (MatchEtag(indexEtag))
 			{
 				Database.IndexStorage.MarkCachedQuery(index);
-				//context.SetStatusToNotModified();
 				return null;
 			}
 
@@ -504,7 +504,6 @@ namespace Raven.Database.Server.Controllers
 				if (MatchEtag(indexEtag))
 				{
 					Database.IndexStorage.MarkCachedQuery(dynamicIndexName);
-					//context.SetStatusToNotModified();
 					return null;
 				}
 			}
@@ -514,6 +513,7 @@ namespace Raven.Database.Server.Controllers
 			{
 				indexEtag = Etag.InvalidEtag;
 				var explanations = Database.ExplainDynamicIndexSelection(entityName, indexQuery);
+				//TODO: msg?
 				//context.SetStatusToBadRequest();
 				//var target = entityName == null ? "all documents" : entityName + " documents";
 				//context.WriteJson(new

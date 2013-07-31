@@ -13,6 +13,7 @@ using Raven.Bundles.Replication.Tasks;
 using Raven.Database.Config;
 using Raven.Database.Extensions;
 using Raven.Database.Server.Abstractions;
+using Raven.Database.Server.WebApi;
 
 namespace Raven.Database.Server
 {
@@ -23,7 +24,7 @@ namespace Raven.Database.Server
 		protected readonly Regex urlMatcher;
 		private Func<InMemoryRavenConfiguration> settings;
 		private Func<DocumentDatabase> database;
-		protected HttpServer server;
+		protected WebApiServer server;
 		private Func<string> tenantId;
 
 		protected AbstractRequestResponder()
@@ -42,7 +43,7 @@ namespace Raven.Database.Server
 
 		public virtual bool IsUserInterfaceRequest { get { return false; } }
 
-		public void Initialize(Func<DocumentDatabase> databaseGetter, Func<InMemoryRavenConfiguration> settingsGetter, Func<string> tenantIdGetter, HttpServer theServer)
+		public void Initialize(Func<DocumentDatabase> databaseGetter, Func<InMemoryRavenConfiguration> settingsGetter, Func<string> tenantIdGetter, WebApiServer theServer)
 		{
 			server = theServer;
 			database = databaseGetter;

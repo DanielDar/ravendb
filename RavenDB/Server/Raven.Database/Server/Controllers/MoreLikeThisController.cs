@@ -1,60 +1,50 @@
-﻿//-----------------------------------------------------------------------
-// <copyright file="MoreLikeThisResponder.cs" company="Hibernating Rhinos LTD">
-//     Copyright (c) Hibernating Rhinos LTD. All rights reserved.
-// </copyright>
-//-----------------------------------------------------------------------
-
-using System;
+﻿using System;
 using System.Collections.Specialized;
+using System.Net;
+using System.Net.Http;
+using System.Web.Http;
 using Raven.Abstractions.Data;
-using Raven.Database.Extensions;
 using Raven.Database.Queries;
-using Raven.Database.Server;
-using Raven.Database.Server.Abstractions;
 
-namespace Raven.Database.Bundles.MoreLikeThis
+namespace Raven.Database.Server.Controllers
 {
-	public class MoreLikeThisResponder : AbstractRequestResponder
+	[RoutePrefix("morelikethis")]
+	public class MoreLikeThisController : RavenApiController
 	{
-		public override string UrlPattern
+		[HttpGet("{id}")]
+		public HttpResponseMessage MoreLikeThisGet()
 		{
-			get { return "^/morelikethis/?(.+)"; } // /morelikethis/?index={index-name}&docid={ravendb-document-id}
-		}
+			var nameValueCollection = new NameValueCollection();
+			foreach (var queryNameValuePair in Request.GetQueryNameValuePairs())
+			{
+				nameValueCollection.Add(queryNameValuePair.Key, queryNameValuePair.Value);
+			}
 
-		public override string[] SupportedVerbs
-		{
-			get { return new[] { "GET" }; }
-		}
-
-		public override void Respond(IHttpContext context)
-		{
-			var parameters = GetParametersFromPath(context.GetRequestUrl(), context.Request.QueryString);
+			var parameters = GetParametersFromPath(GetRequestUrl(), nameValueCollection);
 
 			var index = Database.IndexStorage.GetIndexInstance(parameters.IndexName);
 			if (index == null)
 			{
-				context.SetStatusToNotFound();
-				context.WriteJson(new { Error = "The index " + parameters.IndexName + " cannot be found" });
-				return;
+				return GetMessageWithObject(new {Error = "The index " + parameters.IndexName + " cannot be found"},
+					HttpStatusCode.NotFound);
 			}
 
 			var indexEtag = Database.GetIndexEtag(parameters.IndexName, null);
-			if (context.MatchEtag(indexEtag))
+			if (MatchEtag(indexEtag))
 			{
-				context.SetStatusToNotModified();
-				return;
+				return new HttpResponseMessage(HttpStatusCode.NotModified);
 			}
 
-			var result = Database.ExecuteMoreLikeThisQuery(parameters, GetRequestTransaction(context), context.GetPageSize(Database.Configuration.MaxPageSize), context.Request.QueryString.GetValues("include"));
+			var result = Database.ExecuteMoreLikeThisQuery(parameters, GetRequestTransaction(), GetPageSize(Database.Configuration.MaxPageSize), GetQueryStringValues("include"));
 
-			if (context.MatchEtag(result.Etag))
+			if (MatchEtag(result.Etag))
 			{
-				context.SetStatusToNotModified();
-				return;
+				return new HttpResponseMessage(HttpStatusCode.NotModified);
 			}
 
-			context.Response.AddHeader("ETag", result.Etag.ToString());
-			context.WriteJson(result.Result);
+			var msg = GetMessageWithObject(result.Result);
+			msg.Headers.Add("ETag", result.Etag.ToString());
+			return msg;
 		}
 
 		public static MoreLikeThisQuery GetParametersFromPath(string path, NameValueCollection query)
@@ -93,6 +83,8 @@ namespace Raven.Database.Bundles.MoreLikeThis
 
 			return results;
 		}
+
+
 	}
 
 	internal static class StringConverter

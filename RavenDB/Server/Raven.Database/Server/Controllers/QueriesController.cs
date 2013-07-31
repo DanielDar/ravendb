@@ -89,10 +89,9 @@ namespace Raven.Database.Server.Controllers
 				return new HttpResponseMessage(HttpStatusCode.NotModified);
 			}
 
-			//TODO: etag
-			//context.WriteETag(computedEtag);
-
-			return GetMessageWithObject(result);
+			var msg = GetMessageWithObject(result);
+			WriteETag(computedEtag, msg);
+			return msg;
 		}
 	}
 }

@@ -64,8 +64,6 @@ namespace Raven.Database.Server.Controllers
 				return new HttpResponseMessage(HttpStatusCode.NotModified);
 			}
 			
-			//TODO: write headers
-			//WriteHeaders(new RavenJObject(), lastDocEtag);
 			var databases = Database.GetDocumentsWithIdStartingWith("Raven/Databases/", null, GetStart(),
 			                                                        GetPageSize(Database.Configuration.MaxPageSize));
 			var data = databases
@@ -77,7 +75,10 @@ namespace Raven.Database.Server.Controllers
 				data = data.Where(s => approvedDatabases.Contains(s)).ToArray();
 			}
 
-			return GetMessageWithObject(data);
+			var msg = GetMessageWithObject(data);
+			WriteHeaders(new RavenJObject(), lastDocEtag, msg);
+
+			return msg;
 		}
 
 		[HttpGet("database/size")]

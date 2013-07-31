@@ -1,37 +1,25 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.ComponentModel.Composition;
-using Raven.Abstractions.Extensions;
+using System.Net.Http;
+using System.Web.Http;
 using Raven.Abstractions.MEF;
-using Raven.Database.Extensions;
-using Raven.Database.Impl;
 using Raven.Database.Plugins;
-using Raven.Database.Server.Abstractions;
 
-namespace Raven.Database.Server.Responders
+namespace Raven.Database.Server.Controllers
 {
-	public class SilverlightEnsuresStartup : AbstractRequestResponder
+	[RoutePrefix("silverlight")]
+	public class SilverlightController : RavenApiController
 	{
 		[ImportMany]
 		public OrderedPartCollection<ISilverlightRequestedAware> SilverlightRequestedAware { get; set; }
 
-
-		public override string UrlPattern
-		{
-			get { return @"^/silverlight/ensureStartup$"; }
-		}
-
-		public override string[] SupportedVerbs
-		{
-			get { return new[]{"GET"}; }
-		}
-
-		public override void Respond(IHttpContext context)
+		[HttpGet("ensureStartup")]
+		public HttpResponseMessage SilverlightEnsureStartup()
 		{
 			Database.ExtensionsState.GetOrAdd("SilverlightUI.NotifiedAboutSilverlightBeingRequested", s =>
 			{
 				var skipCreatingStudioIndexes = Database.Configuration.Settings["Raven/SkipCreatingStudioIndexes"];
-				if (string.IsNullOrEmpty(skipCreatingStudioIndexes) == false && 
+				if (string.IsNullOrEmpty(skipCreatingStudioIndexes) == false &&
 					"true".Equals(skipCreatingStudioIndexes, StringComparison.OrdinalIgnoreCase))
 					return true;
 
@@ -42,7 +30,7 @@ namespace Raven.Database.Server.Responders
 				return true;
 			});
 
-			context.WriteJson(new {ok = true});
+			return GetMessageWithObject(new { ok = true });
 		}
 	}
 }

@@ -33,14 +33,16 @@ namespace Raven.Database.Server.Controllers
 				return new HttpResponseMessage(HttpStatusCode.NotModified);
 			}
 
-			//TODO: write headers
-			//WriteHeaders(new RavenJObject(), lastDocEtag);
-
 			var startsWith = GetQueryStringValue("startsWith");
+			HttpResponseMessage msg;
 			if (string.IsNullOrEmpty(startsWith))
-				return GetMessageWithObject(Database.GetDocuments(GetStart(), GetPageSize(Database.Configuration.MaxPageSize), GetEtagFromQueryString()));
-			return GetMessageWithObject(Database.GetDocumentsWithIdStartingWith(startsWith, GetQueryStringValue("matches"),
-			                                                                    GetStart(), GetPageSize(Database.Configuration.MaxPageSize)));
+				msg = GetMessageWithObject(Database.GetDocuments(GetStart(), GetPageSize(Database.Configuration.MaxPageSize),
+					GetEtagFromQueryString()));
+			else
+				msg = GetMessageWithObject(Database.GetDocumentsWithIdStartingWith(startsWith, GetQueryStringValue("matches"),
+					GetStart(), GetPageSize(Database.Configuration.MaxPageSize)));
+			WriteHeaders(new RavenJObject(), lastDocEtag, msg);
+			return msg;
 		}
 
 		[HttpPost("")]
@@ -58,40 +60,43 @@ namespace Raven.Database.Server.Controllers
 		[HttpHead("{id}")]
 		public HttpResponseMessage DocHead(string id)
 		{
-			//TODO: header
-			//context.Response.AddHeader("Content-Type", "application/json; charset=utf-8");
+			var msg = new HttpResponseMessage(HttpStatusCode.OK);
+			msg.Headers.Add("Content-Type", "application/json; charset=utf-8");
 			var docId = id;
 			var transactionInformation = GetRequestTransaction();
 			var documentMetadata = Database.GetDocumentMetadata(docId, transactionInformation);
 			if (documentMetadata == null)
-				return new HttpResponseMessage(HttpStatusCode.NotFound);
+			{
+				msg.StatusCode = HttpStatusCode.NotFound;
+				return msg;
+			}
 			
 			Debug.Assert(documentMetadata.Etag != null);
 			if (MatchEtag(documentMetadata.Etag) && documentMetadata.NonAuthoritativeInformation == false)
-				return new HttpResponseMessage(HttpStatusCode.NotModified);
+			{
+				msg.StatusCode = HttpStatusCode.NotModified;
+				return msg;
+			}
 
-			var status = HttpStatusCode.OK;
 			if (documentMetadata.NonAuthoritativeInformation != null && documentMetadata.NonAuthoritativeInformation.Value)
-				status = HttpStatusCode.NonAuthoritativeInformation;
+				msg.StatusCode = HttpStatusCode.NonAuthoritativeInformation;
 			
 			documentMetadata.Metadata[Constants.DocumentIdFieldName] = documentMetadata.Key;
 			documentMetadata.Metadata[Constants.LastModified] = documentMetadata.LastModified; //HACK ? to get the document's last modified value into the response headers
 			
-			//TODO: headers
-			//context.WriteHeaders(documentMetadata.Metadata, documentMetadata.Etag);
+			WriteHeaders(documentMetadata.Metadata, documentMetadata.Etag, msg);
 
-			return new HttpResponseMessage(status);
+			return msg;
 		}
 
 		[HttpGet("{id}")]
 		public HttpResponseMessage DocGet(string id)
 		{
 			var docId = id;
-			var result = new HttpResponseMessage(HttpStatusCode.OK);
-			//TODO: header
-			//context.Response.AddHeader("Content-Type", "application/json; charset=utf-8");
+			var msg = new HttpResponseMessage(HttpStatusCode.OK);
+			msg.Headers.Add("Content-Type", "application/json; charset=utf-8");
 			if (string.IsNullOrEmpty(GetQueryStringValue("If-None-Match")))
-				return GetDocumentDirectly(docId);
+				return GetDocumentDirectly(docId, msg);
 
 			Database.TransactionalStorage.Batch(
 				_ => // we are running this here to ensure transactional safety for the two operations
@@ -100,24 +105,24 @@ namespace Raven.Database.Server.Controllers
 					var documentMetadata = Database.GetDocumentMetadata(docId, transactionInformation);
 					if (documentMetadata == null)
 					{
-						result = new HttpResponseMessage(HttpStatusCode.NotFound);
+						msg = new HttpResponseMessage(HttpStatusCode.NotFound);
 						return;
 					}
 					Debug.Assert(documentMetadata.Etag != null);
 					if (MatchEtag(documentMetadata.Etag) && documentMetadata.NonAuthoritativeInformation != true)
 					{
-						result = new HttpResponseMessage(HttpStatusCode.NotModified);
+						msg.StatusCode = HttpStatusCode.NotModified;
 						return;
 					}
 					if (documentMetadata.NonAuthoritativeInformation != null && documentMetadata.NonAuthoritativeInformation.Value)
 					{
-						result = new HttpResponseMessage(HttpStatusCode.NonAuthoritativeInformation);
+						msg.StatusCode = HttpStatusCode.NonAuthoritativeInformation;
 					}
 
-					result = GetDocumentDirectly(docId);
+					msg = GetDocumentDirectly(docId, msg);
 				});
 
-			return result;
+			return msg;
 		}
 
 		[HttpDelete("{id}")]
@@ -159,25 +164,26 @@ namespace Raven.Database.Server.Controllers
 			return ProcessPatchResult(docId, advPatchResult.Item1.PatchResult, advPatchResult.Item2, advPatchResult.Item1.Document);
 		}
 
-		private HttpResponseMessage GetDocumentDirectly(string docId)
+		private HttpResponseMessage GetDocumentDirectly(string docId, HttpResponseMessage msg)
 		{
-			var status = HttpStatusCode.OK;
 			var doc = Database.Get(docId, GetRequestTransaction());
 			if (doc == null)
-				return new HttpResponseMessage(HttpStatusCode.NotFound);
+			{
+				msg.StatusCode = HttpStatusCode.NotFound;
+				return msg;
+			}
+				
 			
 			if (doc.NonAuthoritativeInformation != null && doc.NonAuthoritativeInformation.Value)
 			{
-				status = HttpStatusCode.NonAuthoritativeInformation;
+				msg.StatusCode = HttpStatusCode.NonAuthoritativeInformation;
 			}
 
 			Debug.Assert(doc.Etag != null);
 			doc.Metadata[Constants.LastModified] = doc.LastModified;
 			doc.Metadata[Constants.DocumentIdFieldName] = Uri.EscapeUriString(doc.Key ?? string.Empty);
 			
-			WriteData(doc.DataAsJson, doc.Metadata, doc.Etag);
-
-			return new HttpResponseMessage(status);
+			return WriteData(doc.DataAsJson, doc.Metadata, doc.Etag,msg: msg);
 		}
 
 		private HttpResponseMessage ProcessPatchResult(string docId, PatchResult patchResult, object debug, RavenJObject document)
@@ -187,9 +193,9 @@ namespace Raven.Database.Server.Controllers
 				case PatchResult.DocumentDoesNotExists:
 					return new HttpResponseMessage(HttpStatusCode.NotFound);
 				case PatchResult.Patched:
-					//TODO: header
-					//context.Response.AddHeader("Location", Database.Configuration.GetFullUrl("/docs/" + docId));
-					return GetMessageWithObject(new { Patched = true, Debug = debug });
+					var msg = GetMessageWithObject(new { Patched = true, Debug = debug });
+					msg.Headers.Add("Location", Database.Configuration.GetFullUrl("/docs/" + docId));
+					return msg;
 				case PatchResult.Tested:
 					return GetMessageWithObject(new
 					{

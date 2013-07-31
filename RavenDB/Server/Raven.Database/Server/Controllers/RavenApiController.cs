@@ -5,20 +5,23 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Formatting;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.Http;
-using Lucene.Net.Search;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Extensions;
 using Raven.Abstractions.Indexing;
 using Raven.Abstractions.Json;
+using Raven.Database.Extensions;
+using Raven.Database.Server.Abstractions;
 using Raven.Database.Server.Tenancy;
 using Raven.Database.Server.WebApi;
 using System.Linq;
 using Raven.Imports.Newtonsoft.Json;
+using Raven.Imports.Newtonsoft.Json.Linq;
 using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
@@ -74,6 +77,13 @@ namespace Raven.Database.Server.Controllers
 			using (var streamReader = new StreamReader(stream, GetRequestEncoding()))
 			using (var jsonReader = new RavenJsonTextReader(streamReader))
 				return RavenJArray.Load(jsonReader);
+		}
+
+		public async Task<string> ReadStringAsync()
+		{
+			using (var stream = await Request.Content.ReadAsStreamAsync())
+			using (var streamReader = new StreamReader(stream, GetRequestEncoding()))
+				return streamReader.ReadToEnd();
 		}
 
 		private Encoding GetRequestEncoding()
@@ -179,8 +189,7 @@ namespace Raven.Database.Server.Controllers
 						QueryOperator.Or,
 
 				AggregationOperation = GetAggregationOperation(),
-				SortedFields = GetQueryStringValues("sort")
-					.EmptyIfNull()
+				SortedFields = EnumerableExtension.EmptyIfNull(GetQueryStringValues("sort"))
 					.Select(x => new SortedField(x))
 					.ToArray(),
 				HighlightedFields = GetHighlightedFields().ToArray(),
@@ -261,7 +270,7 @@ namespace Raven.Database.Server.Controllers
 
 		public IEnumerable<HighlightedField> GetHighlightedFields()
 		{
-			var highlightedFieldStrings = GetQueryStringValues("highlight").EmptyIfNull();
+			var highlightedFieldStrings = EnumerableExtension.EmptyIfNull(GetQueryStringValues("highlight"));
 			var fields = new HashSet<string>();
 
 			foreach (var highlightedFieldString in highlightedFieldStrings)
@@ -295,66 +304,67 @@ namespace Raven.Database.Server.Controllers
 			return result;
 		}
 
-		//public void WriteETag(Etag etag)
-		//{
-		//	WriteETag(etag.ToString());
-		//}
+		public void WriteETag(Etag etag, HttpResponseMessage msg)
+		{
+			if (etag == null)
+				return;
+			WriteETag(etag.ToString(), msg);
+		}
 
-		//public void WriteETag(string etag)
-		//{
+		public void WriteETag(string etag, HttpResponseMessage msg)
+		{
+			if (string.IsNullOrWhiteSpace(etag))
+				return;
+			string clientVersion = GetHeader("Raven-Client-Version");
 
-		//	string clientVersion = null;
-		//	if(Request.Headers.Contains("Raven-Client-Version"))
-		//		clientVersion = Request.Headers.GetValues("Raven-Client-Version").FirstOrDefault();
+			if (string.IsNullOrEmpty(clientVersion))
+			{
+				msg.Headers.Add("ETag", etag);
+				return;
+			}
 
-		//	if (string.IsNullOrEmpty(clientVersion))
-		//	{
-		//		HttpContext.Current.Response.AppendHeader("ETag", etag);
-		//		return;
-		//	}
+			msg.Headers.Add("ETag", "\"" + etag + "\"");
+		}
 
-		//	HttpContext.Current.Response.AppendHeader("ETag", "\"" + etag + "\"");
-		//}
+		public void WriteHeaders(RavenJObject headers, Etag etag, HttpResponseMessage msg)
+		{
+			foreach (var header in headers)
+			{
+				if (header.Key.StartsWith("@"))
+					continue;
 
-		//public void WriteHeaders(RavenJObject headers, Etag etag)
-		//{
-		//	foreach (var header in headers)
-		//	{
-		//		if (header.Key.StartsWith("@"))
-		//			continue;
+				switch (header.Key)
+				{
+					case "Content-Type":
+						msg.Content.Headers.ContentType = new MediaTypeHeaderValue(header.Value.Value<string>());
+						break;
+					default:
+						if (header.Value.Type == JTokenType.Date)
+						{
+							var rfc1123 = GetDateString(header.Value, "r");
+							var iso8601 = GetDateString(header.Value, "o");
+							msg.Headers.Add(header.Key, rfc1123);
+							if (header.Key.StartsWith("Raven-") == false)
+							{
+								msg.Headers.Add("Raven-" + header.Key, iso8601);
+							}
+						}
+						else
+						{
+							var value = UnescapeStringIfNeeded(header.Value.ToString(Formatting.None));
+							msg.Headers.Add(header.Key, value);
+						}
+						break;
+				}
+			}
+			if (headers["@Http-Status-Code"] != null)
+			{
+				msg.StatusCode = (HttpStatusCode)headers.Value<int>("@Http-Status-Code");
+				msg.Headers.Add("Temp-Status-Description", headers.Value<string>("@Http-Status-Description"));
+			}
 
-		//		switch (header.Key)
-		//		{
-		//			case "Content-Type":
-		//				HttpContext.Current.Response.ContentType = header.Value.Value<string>();
-		//				break;
-		//			default:
-		//				if (header.Value.Type == JTokenType.Date)
-		//				{
-		//					var rfc1123 = GetDateString(header.Value, "r");
-		//					var iso8601 = GetDateString(header.Value, "o");
-		//					HttpContext.Current.Response.AddHeader(header.Key, rfc1123);
-		//					if (header.Key.StartsWith("Raven-") == false)
-		//					{
-		//						HttpContext.Current.Response.AddHeader("Raven-" + header.Key, iso8601);
-		//					}
-		//				}
-		//				else
-		//				{
-		//					var value = UnescapeStringIfNeeded(header.Value.ToString(Formatting.None));
-		//					HttpContext.Current.Response.AddHeader(header.Key, value);
-		//				}
-		//				break;
-		//		}
-		//	}
-		//	if (headers["@Http-Status-Code"] != null)
-		//	{
-		//		HttpContext.Current.Response.StatusCode = headers.Value<int>("@Http-Status-Code");
-		//		HttpContext.Current.Response.StatusDescription = headers.Value<string>("@Http-Status-Description");
-		//	}
-			
-		//	WriteETag(etag);
-		//}
+			WriteETag(etag, msg);
+		}
 
 		private string GetDateString(RavenJToken token, string format)
 		{
@@ -387,46 +397,52 @@ namespace Raven.Database.Server.Controllers
 
 		protected HttpResponseMessage GetMessageWithObject(object item, HttpStatusCode code = HttpStatusCode.OK, Etag etag = null)
 		{
-			//TODO: add etag
-			return new HttpResponseMessage(code)
+			var msg = new HttpResponseMessage(code)
 			{
-				Content = new ObjectContent(typeof(object), item, new JsonMediaTypeFormatter())
+				Content = new ObjectContent(typeof (object), item, new JsonMediaTypeFormatter())
 			};
+			WriteETag(etag, msg);
+
+			return msg;
 		}
 
 		protected HttpResponseMessage GetMessageWithString(string msg, HttpStatusCode code = HttpStatusCode.OK, Etag etag = null)
 		{
-			//TODO: add etag
-			return new HttpResponseMessage(code)
+			var resMsg = new HttpResponseMessage(code)
 			{
 				Content = new StringContent(msg)
 			};
+			WriteETag(etag, resMsg);
+
+			return resMsg;
 		}
 
 		private static readonly Encoding DefaultEncoding = new UTF8Encoding(false);
-		public void WriteData(RavenJObject data, RavenJObject headers, Etag etag)
+		public HttpResponseMessage WriteData(RavenJObject data, RavenJObject headers, Etag etag, HttpStatusCode status = HttpStatusCode.OK, HttpResponseMessage msg = null)
 		{
+			if(msg == null)
+				msg = new HttpResponseMessage(status);
 			var str = data.ToString(Formatting.None);
 			var jsonp = GetQueryStringValue("jsonp");
 			if (string.IsNullOrEmpty(jsonp) == false)
 			{
 				str = jsonp + "(" + str + ");";
-				//TODO: header
-				//context.Response.AddHeader("Content-Type", "application/javascript; charset=utf-8");
+				
+				msg.Headers.Add("Content-Type", "application/javascript; charset=utf-8");
 			}
 			else
 			{
-				//TODO: header
-				//context.Response.AddHeader("Content-Type", "application/json; charset=utf-8");
+				msg.Headers.Add("Content-Type", "application/json; charset=utf-8");
 			}
-			WriteData(DefaultEncoding.GetBytes(str), headers, etag);
+
+			return WriteData(DefaultEncoding.GetBytes(str), headers, etag, msg);
 		}
 
-		public void WriteData(byte[] data, RavenJObject headers, Etag etag)
+		public HttpResponseMessage WriteData(byte[] data, RavenJObject headers, Etag etag, HttpResponseMessage msg)
 		{
-			//TODO: header
-			//context.WriteHeaders(headers, etag);
-			//Response.OutputStream.Write(data, 0, data.Length);
+			msg.Content = new ByteArrayContent(data);
+			WriteHeaders(headers, etag, msg);
+			return msg;
 		}
 
 		public Etag GetEtag()
@@ -443,6 +459,7 @@ namespace Raven.Database.Server.Controllers
 					return result;
 				throw new BadRequestException("Could not parse If-None-Match or If-Match header as Guid");
 			}
+
 			return null;
 		}
 
@@ -451,6 +468,126 @@ namespace Raven.Database.Server.Controllers
 			if (Request.Headers.Contains(key) == false)
 				return null;
 			return Request.Headers.GetValues(key).FirstOrDefault();
+		}
+
+		protected bool GetCheckForUpdates()
+		{
+			bool result;
+			bool.TryParse(GetQueryStringValue("checkForUpdates"), out result);
+			return result;
+		}
+
+		protected bool GetCheckReferencesInIndexes()
+		{
+			bool result;
+			bool.TryParse(GetQueryStringValue("checkReferencesInIndexes"), out result);
+			return result;
+		}
+
+		protected  bool GetAllowStale()
+		{
+			bool stale;
+			bool.TryParse(GetQueryStringValue("allowStale"), out stale);
+			return stale;
+		}
+
+		//TODO: check
+		private static readonly string EmbeddedLastChangedDate =
+			File.GetLastWriteTime(typeof(HttpExtensions).Assembly.Location).Ticks.ToString("G");
+		public HttpResponseMessage WriteEmbeddedFile(string ravenPath, string docPath)
+		{
+			var filePath = Path.Combine(ravenPath, docPath);
+			var type = GetContentType(docPath);
+			if (File.Exists(filePath))
+				return WriteFile(filePath, type);
+			return WriteEmbeddedFileOfType(docPath,type);
+		}
+
+		public HttpResponseMessage WriteFile(string filePath, string type)
+		{
+			var etagValue = GetHeader("If-None-Match") ?? GetHeader("If-None-Match");
+			var fileEtag = File.GetLastWriteTimeUtc(filePath).ToString("G");
+			if (etagValue == fileEtag)
+			{
+				return new HttpResponseMessage(HttpStatusCode.NotModified);
+			}
+
+			var msg = new HttpResponseMessage
+			{
+				Content = new StreamContent(new FileStream(filePath, FileMode.Open))
+			};
+
+			WriteETag(fileEtag, msg);
+
+			return msg;
+		}
+
+		private HttpResponseMessage WriteEmbeddedFileOfType(string docPath, string type)
+		{
+			var etagValue = GetHeader("If-None-Match") ?? GetHeader("If-Match");
+			var currentFileEtag = EmbeddedLastChangedDate + docPath;
+			if (etagValue == currentFileEtag)
+			{
+				return new HttpResponseMessage(HttpStatusCode.NotModified);
+			}
+
+			byte[] bytes;
+			string resourceName = "Raven.Database.Server.WebUI." + docPath.Replace("/", ".");
+			//TODO: check the typeof
+			using (var resource = typeof(IHttpContext).Assembly.GetManifestResourceStream(resourceName))
+			{
+				if (resource == null)
+				{
+					return new HttpResponseMessage(HttpStatusCode.NotFound);
+				}
+				bytes = resource.ReadData();
+			}
+			var msg =  new HttpResponseMessage
+			{
+				Content = new ByteArrayContent(bytes),
+			};
+
+			msg.Headers.Add("Content-Type", type);
+			WriteETag(etagValue, msg);
+
+			return msg;
+		}
+
+		private static string GetContentType(string docPath)
+		{
+			switch (Path.GetExtension(docPath))
+			{
+				case ".html":
+				case ".htm":
+					return "text/html";
+				case ".css":
+					return "text/css";
+				case ".js":
+					return "text/javascript";
+				case ".ico":
+					return "image/vnd.microsoft.icon";
+				case ".jpg":
+					return "image/jpeg";
+				case ".gif":
+					return "image/gif";
+				case ".png":
+					return "image/png";
+				case ".xap":
+					return "application/x-silverlight-2";
+				default:
+					return "text/plain";
+			}
+		}
+
+		public string GetRequestUrl()
+		{
+			var rawUrl = Request.RequestUri.AbsoluteUri;
+			return UrlExtension.GetRequestUrlFromRawUrl(rawUrl, DatabasesLandlord.SystemConfiguration);
+		}
+
+		public void WriteType(string type, HttpResponseMessage msg)
+		{
+			msg.Headers.Add("Content-Type", type);
 		}
 	}
 }

@@ -9,14 +9,15 @@ using System.Web;
 using Raven.Abstractions.Util;
 using Raven.Database.Server;
 using Raven.Database.Server.Abstractions;
+using Raven.Database.Server.WebApi;
 
 namespace Raven.Web
 {
 	public class ChangesCurrentDatabaseForwardingHandler : IHttpAsyncHandler
 	{
-		private readonly HttpServer server;
+		private readonly WebApiServer server;
 
-		public ChangesCurrentDatabaseForwardingHandler(HttpServer server)
+		public ChangesCurrentDatabaseForwardingHandler(WebApiServer server)
 		{
 			this.server = server;
 		}

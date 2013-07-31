@@ -27,6 +27,7 @@ using Raven.Database.Impl;
 using Raven.Database.Plugins;
 using Raven.Database.Server;
 using Raven.Database.Server.Security;
+using Raven.Database.Server.WebApi;
 using Raven.Database.Storage;
 using Raven.Json.Linq;
 using Raven.Server;
@@ -323,7 +324,7 @@ namespace Raven.Tests.Helpers
 											   new RavenJObject());
 
 			documentStore.Configuration.AnonymousUserAccessMode = AnonymousUserAccessMode.Admin;
-			using (var server = new HttpServer(documentStore.Configuration, documentStore.DocumentDatabase))
+			using (var server = new WebApiServer(documentStore.Configuration, documentStore.DocumentDatabase))
 			{
 				server.StartListening();
 				Process.Start(documentStore.Configuration.ServerUrl); // start the server

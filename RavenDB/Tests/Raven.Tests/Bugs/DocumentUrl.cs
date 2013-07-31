@@ -5,6 +5,7 @@
 //-----------------------------------------------------------------------
 using Raven.Client.Document;
 using Raven.Database.Server;
+using Raven.Database.Server.WebApi;
 using Raven.Tests.Indexes;
 using Xunit;
 
@@ -18,7 +19,7 @@ namespace Raven.Tests.Bugs
 			using (var store = NewDocumentStore())
 			{
 				store.Configuration.Port = 8079;
-				using (var server = new HttpServer(store.Configuration, store.DocumentDatabase))
+				using (var server = new WebApiServer(store.Configuration, store.DocumentDatabase))
 				{
 					server.StartListening();
 					using (var documentStore = new DocumentStore
@@ -44,7 +45,7 @@ namespace Raven.Tests.Bugs
 			using (var store = NewDocumentStore())
 			{
 				store.Configuration.Port = 8079;
-				using (var server = new HttpServer(store.Configuration, store.DocumentDatabase))
+				using (var server = new WebApiServer(store.Configuration, store.DocumentDatabase))
 				{
 					server.StartListening();
 					using (var documentStore = new DocumentStore

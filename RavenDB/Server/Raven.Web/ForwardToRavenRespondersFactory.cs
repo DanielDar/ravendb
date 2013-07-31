@@ -13,13 +13,14 @@ using Raven.Database;
 using Raven.Database.Config;
 using Raven.Database.Server;
 using Raven.Database.Server.Abstractions;
+using Raven.Database.Server.WebApi;
 
 namespace Raven.Web
 {
 	public class ForwardToRavenRespondersFactory : IHttpHandlerFactory
 	{
 		internal static DocumentDatabase database;
-		internal static HttpServer server;
+		internal static WebApiServer server;
 		private static readonly object locker = new object();
 
 		private static ILog log = LogManager.GetCurrentClassLogger();
@@ -67,7 +68,7 @@ namespace Raven.Web
 
 			var reqUrl = UrlExtension.GetRequestUrlFromRawUrl(context.Request.RawUrl, database.Configuration);
 
-			if (HttpServer.ChangesQuery.IsMatch(reqUrl))
+			if (WebApiServer.ChangesQuery.IsMatch(reqUrl))
 			{
 				return new ChangesCurrentDatabaseForwardingHandler(server);
 			}
@@ -97,7 +98,7 @@ namespace Raven.Web
 					HttpEndpointRegistration.RegisterHttpEndpointTarget();
 					database = new DocumentDatabase(ravenConfiguration);
 					database.SpinBackgroundWorkers();
-					server = new HttpServer(ravenConfiguration, database);
+					server = new WebApiServer(ravenConfiguration, database);
 					server.Init();
 				}
 				catch

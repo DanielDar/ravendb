@@ -1,14 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using System.Web.Http;
 using System.Web.Http.Dispatcher;
 using System.Web.Http.SelfHost;
 using System.Web.Http.Services;
 using Raven.Database.Config;
+using Raven.Database.Server.Abstractions;
 using Raven.Database.Server.Controllers;
+using Raven.Database.Server.Responders;
 using Raven.Database.Server.Tenancy;
 
 namespace Raven.Database.Server.WebApi
@@ -68,11 +72,12 @@ namespace Raven.Database.Server.WebApi
 			return server.OpenAsync();
 		}
 
+		private int reqNum;
 		public void ResetNumberOfRequests()
 		{
 			//TODO: implement method
-//			Interlocked.Exchange(ref reqNum, 0);
-//			Interlocked.Exchange(ref physicalRequestsCount, 0);
+			Interlocked.Exchange(ref reqNum, 0);
+			Interlocked.Exchange(ref physicalRequestsCount, 0);
 //#if DEBUG
 //			while (recentRequests.Count > 0)
 //			{
@@ -81,6 +86,9 @@ namespace Raven.Database.Server.WebApi
 //			}
 //#endif
 		}
+
+		public static readonly Regex ChangesQuery = new Regex("^(/databases/([^/]+))?/changes/events", RegexOptions.IgnoreCase);
+
 
 		private int physicalRequestsCount;
 		public int NumberOfRequests
@@ -99,6 +107,31 @@ namespace Raven.Database.Server.WebApi
 			{
 				return new[] { typeof(RavenApiController).Assembly };
 			}
+		}
+
+		public DocumentDatabase SystemDatabase
+		{
+			get { return databasesLandlord.SystemDatabase; }
+		}
+
+		public InMemoryRavenConfiguration SystemConfiguration
+		{
+			get { return databasesLandlord.SystemConfiguration; }
+		}
+
+		public void HandleActualRequest(IHttpContext context)
+		{
+			throw new NotImplementedException();
+		}
+
+		public Task HandleChangesRequest(IHttpContext httpContext, Func<bool> func)
+		{
+			throw new NotImplementedException();
+		}
+
+		public void Init()
+		{
+			throw new NotImplementedException();
 		}
 	}
 }

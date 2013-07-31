@@ -5,6 +5,7 @@
 //-----------------------------------------------------------------------
 using System.ComponentModel.Composition;
 using Raven.Database.Server;
+using Raven.Database.Server.WebApi;
 
 namespace Raven.Database.Plugins
 {
@@ -17,6 +18,6 @@ namespace Raven.Database.Plugins
 	[InheritedExport]
 	public interface IServerStartupTask
 	{
-		void Execute(HttpServer server);
+		void Execute(WebApiServer server);
 	}
 }

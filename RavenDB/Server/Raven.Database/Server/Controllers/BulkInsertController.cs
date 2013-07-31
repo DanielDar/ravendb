@@ -3,62 +3,59 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Web;
+using System.Web.Http;
 using Raven.Abstractions.Data;
-using Raven.Abstractions.Logging;
-using Raven.Database.Server.Abstractions;
 using Raven.Database.Util.Streams;
 using Raven.Imports.Newtonsoft.Json.Bson;
-using Raven.Database.Extensions;
 using Raven.Json.Linq;
-using Task = System.Threading.Tasks.Task;
 
-namespace Raven.Database.Server.Responders
+namespace Raven.Database.Server.Controllers
 {
-	public class BulkInsert : AbstractRequestResponder
+	[RoutePrefix("bulkInsert")]
+	public class BulkInsertController : RavenApiController
 	{
-		public override string UrlPattern
+		[HttpPost("")]
+		public HttpResponseMessage BulkInsertPost()
 		{
-			get { return "^/bulkInsert$"; }
-		}
-		public override string[] SupportedVerbs
-		{
-			get { return new[] { "POST" }; }
-		}
-		public override void Respond(IHttpContext context)
-		{
-			if (string.IsNullOrEmpty(context.Request.QueryString["no-op"]) == false)
+			if (string.IsNullOrEmpty(GetQueryStringValue("no-op")) == false)
 			{
 				// this is a no-op request which is there just to force the client HTTP layer to handle the authentication
 				// only used for legacy clients
-				return; 
+				return new HttpResponseMessage(HttpStatusCode.OK);
 			}
-			if("generate-single-use-auth-token".Equals(context.Request.QueryString["op"],StringComparison.InvariantCultureIgnoreCase))
+			if ("generate-single-use-auth-token".Equals(GetQueryStringValue("op"), StringComparison.InvariantCultureIgnoreCase))
 			{
 				// using windows auth with anonymous access = none sometimes generate a 401 even though we made two requests
 				// instead of relying on windows auth, which require request buffering, we generate a one time token and return it.
 				// we KNOW that the user have access to this db for writing, since they got here, so there is no issue in generating 
 				// a single use token for them.
-				var token = server.RequestAuthorizer.GenerateSingleUseAuthToken(Database, context.User);
-				context.WriteJson(new
-				{
-					Token = token
-				});
-				return;
+
+				//TODO: after adding the authorzier
+				//var token = DatabasesLandlord.RequestAuthorizer.GenerateSingleUseAuthToken(Database, User);
+				//return GetMessageWithObject(new
+				//{
+				//	Token = token
+				//});
+
+				return new HttpResponseMessage(HttpStatusCode.OK);
 			}
 
 			if (HttpContext.Current != null)
 			{
-				HttpContext.Current.Server.ScriptTimeout = 60*60*6; // six hours should do it, I think.
+				HttpContext.Current.Server.ScriptTimeout = 60 * 60 * 6; // six hours should do it, I think.
 			}
 			var options = new BulkInsertOptions
 			{
-				CheckForUpdates = context.GetCheckForUpdates(),
-				CheckReferencesInIndexes = context.GetCheckReferencesInIndexes()
+				CheckForUpdates = GetCheckForUpdates(),
+				CheckReferencesInIndexes = GetCheckReferencesInIndexes()
 			};
 
-			var operationId = ExtractOperationId(context);
+			var operationId = ExtractOperationId();
 			var sp = Stopwatch.StartNew();
 
 			var status = new BulkInsertStatus();
@@ -69,9 +66,9 @@ namespace Raven.Database.Server.Responders
 			var currentDatbase = Database;
 			var task = Task.Factory.StartNew(() =>
 			{
-				currentDatbase.BulkInsert(options, YieldBatches(context, mre, batchSize => documents += batchSize), operationId);
-			    status.Documents = documents;
-			    status.Completed = true;
+				currentDatbase.BulkInsert(options, YieldBatches(mre, batchSize => documents += batchSize), operationId);
+				status.Documents = documents;
+				status.Completed = true;
 			});
 
 			long id;
@@ -79,26 +76,29 @@ namespace Raven.Database.Server.Responders
 
 			mre.Wait(Database.WorkContext.CancellationToken);
 
-			context.Log(log => log.Debug("\tBulk inserted received {0:#,#;;0} documents in {1}, task #: {2}", documents, sp.Elapsed, id));
+			//TODO: log
+			//context.Log(log => log.Debug("\tBulk inserted received {0:#,#;;0} documents in {1}, task #: {2}", documents, sp.Elapsed, id));
 
-			context.WriteJson(new
+			return GetMessageWithObject(new
 			{
 				OperationId = id
 			});
 		}
 
-		private static Guid ExtractOperationId(IHttpContext context)
+		private Guid ExtractOperationId()
 		{
 			Guid result;
-			Guid.TryParse(context.Request.QueryString["operationId"], out result);
+			Guid.TryParse(GetQueryStringValue("operationId"), out result);
 			return result;
 		}
 
-		private static IEnumerable<IEnumerable<JsonDocument>> YieldBatches(IHttpContext context, ManualResetEventSlim mre, Action<int> increaseDocumentsCount)
+		private IEnumerable<IEnumerable<JsonDocument>> YieldBatches(ManualResetEventSlim mre, Action<int> increaseDocumentsCount)
 		{
 			try
 			{
-				using (var inputStream = context.Request.GetBufferLessInputStream())
+				//TODO: change to GetBufferLessInputStream
+				using (var inputStream = new MemoryStream())
+				//using (var inputStream = Request.GetBufferLessInputStream())
 				{
 					var binaryReader = new BinaryReader(inputStream);
 					while (true)
@@ -127,7 +127,7 @@ namespace Raven.Database.Server.Responders
 
 		private static IEnumerable<JsonDocument> YieldDocumentsInBatch(Stream partialStream, Action<int> increaseDocumentsCount)
 		{
-			using(var stream = new GZipStream(partialStream, CompressionMode.Decompress, leaveOpen:true))
+			using (var stream = new GZipStream(partialStream, CompressionMode.Decompress, leaveOpen: true))
 			{
 				var reader = new BinaryReader(stream);
 				var count = reader.ReadInt32();
@@ -159,11 +159,11 @@ namespace Raven.Database.Server.Responders
 			}
 		}
 
-        public class BulkInsertStatus
-        {
-            public int Documents { get; set; }
-            public bool Completed { get; set; }
-        }
+		public class BulkInsertStatus
+		{
+			public int Documents { get; set; }
+			public bool Completed { get; set; }
+		}
 	}
 
 }

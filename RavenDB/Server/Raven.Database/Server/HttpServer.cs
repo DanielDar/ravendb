@@ -147,7 +147,7 @@ namespace Raven.Database.Server
 
 			foreach (var task in configuration.Container.GetExportedValues<IServerStartupTask>())
 			{
-				task.Execute(this);
+				//task.Execute(this);
 			}
 		}
 

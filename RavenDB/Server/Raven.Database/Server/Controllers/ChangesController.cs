@@ -1,42 +1,28 @@
-﻿// -----------------------------------------------------------------------
-//  <copyright file="ChangesConfig.cs" company="Hibernating Rhinos LTD">
-//      Copyright (c) Hibernating Rhinos LTD. All rights reserved.
-//  </copyright>
-// -----------------------------------------------------------------------
-using System;
-using Raven.Database.Server.Abstractions;
-using Raven.Database.Extensions;
+﻿using System;
+using System.Net;
+using System.Net.Http;
+using System.Web.Http;
 
-namespace Raven.Database.Server.Responders
+namespace Raven.Database.Server.Controllers
 {
-	public class ChangesConfig : AbstractRequestResponder
+	[RoutePrefix("changes")]
+	public class ChangesController : RavenApiController
 	{
-		public override string UrlPattern
+		[HttpGet("config")]
+		public HttpResponseMessage ChangeConfigGet()
 		{
-			get { return "^/changes/config$"; }
-		}
-
-		public override string[] SupportedVerbs
-		{
-			get { return new[] { "GET" }; }
-		}
-
-		public override void Respond(IHttpContext context)
-		{
-			var id = context.Request.QueryString["id"];
+			var id = GetQueryStringValue("id");
 			if (string.IsNullOrEmpty(id))
 			{
-				context.SetStatusToBadRequest();
-				context.WriteJson(new
-									{
-										Error = "id query string parameter is mandatory when using changes/config endpoint"
-									});
-				return;
+				return GetMessageWithObject(new
+				{
+					Error = "id query string parameter is mandatory when using changes/config endpoint"
+				}, HttpStatusCode.BadRequest);
 			}
 
-			var name = context.Request.QueryString["value"];
+			var name = GetQueryStringValue("value");
 			var connectionState = Database.TransportState.For(id);
-			var cmd = context.Request.QueryString["command"];
+			var cmd = GetQueryStringValue("command");
 			if (Match(cmd, "disconnect"))
 			{
 				Database.TransportState.Disconnect(id);
@@ -99,12 +85,13 @@ namespace Raven.Database.Server.Responders
 			}
 			else
 			{
-				context.SetStatusToBadRequest();
-				context.WriteJson(new
+				return GetMessageWithObject(new
 				{
 					Error = "command argument is mandatory"
-				});
+				}, HttpStatusCode.BadRequest);
 			}
+
+			return GetMessageWithObject(connectionState);
 		}
 
 		private bool Match(string x, string y)

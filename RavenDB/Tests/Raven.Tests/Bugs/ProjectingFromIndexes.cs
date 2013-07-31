@@ -8,6 +8,7 @@ using Raven.Abstractions.Indexing;
 using Raven.Client.Indexes;
 using Raven.Database.Indexing;
 using Raven.Database.Server;
+using Raven.Database.Server.WebApi;
 using Xunit;
 
 namespace Raven.Tests.Bugs
@@ -18,7 +19,7 @@ namespace Raven.Tests.Bugs
 		public void CanProjectFromIndex()
 		{
 			using (var documentStore = NewDocumentStore())
-			using (var httpServer = new HttpServer(documentStore.Configuration, documentStore.DocumentDatabase))
+			using (var httpServer = new WebApiServer(documentStore.Configuration, documentStore.DocumentDatabase))
 			{
 				httpServer.StartListening();
 				documentStore.DatabaseCommands.PutIndex("ImagesByTag",
