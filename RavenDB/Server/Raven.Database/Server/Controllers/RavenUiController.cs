@@ -3,10 +3,10 @@ using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("raven")]
+	[RoutePrefix("")]
 	public class RavenUiController : RavenApiController
 	{
-		[HttpGet("")]
+		[HttpGet("raven")]
 		public HttpResponseMessage RavenUiGet()
 		{
 			if (string.IsNullOrEmpty(Database.Configuration.RedirectStudioUrl) == false)

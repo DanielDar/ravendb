@@ -16,10 +16,10 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("bulkInsert")]
+	[RoutePrefix("")]
 	public class BulkInsertController : RavenApiController
 	{
-		[HttpPost("")]
+		[HttpPost("bulkInsert")]
 		public HttpResponseMessage BulkInsertPost()
 		{
 			if (string.IsNullOrEmpty(GetQueryStringValue("no-op")) == false)

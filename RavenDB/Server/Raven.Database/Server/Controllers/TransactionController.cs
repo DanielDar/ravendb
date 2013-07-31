@@ -3,10 +3,10 @@ using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("transaction")]
+	[RoutePrefix("")]
 	public class TransactionController : RavenApiController
 	{
-		[HttpPost("rollback")]
+		[HttpPost("transaction/rollback")]
 		public HttpResponseMessage Rollback()
 		{
 			var txId = GetQueryStringValue("tx");
@@ -14,14 +14,14 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(new { Rollbacked = txId });
 		}
 
-		[HttpGet("status")]
+		[HttpGet("transaction/status")]
 		public HttpResponseMessage Status()
 		{
 			var txId = GetQueryStringValue("tx");
 			return GetMessageWithObject(new { Exists = Database.HasTransaction(txId) });
 		}
 
-		[HttpPost("prepare")]
+		[HttpPost("transaction/prepare")]
 		public HttpResponseMessage Prepare()
 		{
 			var txId = GetQueryStringValue("tx");
@@ -30,7 +30,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(new { Prepared = txId });
 		}
 
-		[HttpPost("commit")]
+		[HttpPost("transaction/commit")]
 		public HttpResponseMessage Commit()
 		{
 			var txId = GetQueryStringValue("tx");

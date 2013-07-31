@@ -6,11 +6,11 @@ using Raven.Database.Queries;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("terms")]
-	[RoutePrefix("databases/{databaseName}/terms")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class TermsController : RavenApiController
 	{
-		[HttpGet("{id}")]
+		[HttpGet("terms/{*id}")]
 		public HttpResponseMessage TermsGet(string id)
 		{
 			var index = id;

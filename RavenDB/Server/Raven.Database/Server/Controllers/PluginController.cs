@@ -6,10 +6,10 @@ using Raven.Database.Plugins;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("plugins")]
+	[RoutePrefix("")]
 	public class PluginController : RavenApiController
 	{
-		[HttpGet("status")]
+		[HttpGet("plugins/status")]
 		public HttpResponseMessage PlugingsStatusGet()
 		{
 			var dir = DatabasesLandlord.SystemDatabase.Configuration.PluginsDirectory;

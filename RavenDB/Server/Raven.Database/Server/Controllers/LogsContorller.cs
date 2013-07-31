@@ -9,11 +9,11 @@ using Raven.Database.Util;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("logs")]
-	[RoutePrefix("databases/{databaseName}/logs")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class LogsContorller : RavenApiController
 	{
-		[HttpGet("")]
+		[HttpGet("logs")]
 		public HttpResponseMessage LogsGet()
 		{
 			var target = LogManager.GetTarget<DatabaseMemoryTarget>();

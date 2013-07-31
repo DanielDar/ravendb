@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Formatting;
@@ -15,6 +16,7 @@ using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Extensions;
 using Raven.Abstractions.Indexing;
 using Raven.Abstractions.Json;
+using Raven.Bundles.Compression.Streams;
 using Raven.Database.Extensions;
 using Raven.Database.Server.Abstractions;
 using Raven.Database.Server.Tenancy;
@@ -52,6 +54,7 @@ namespace Raven.Database.Server.Controllers
 		public async Task<T> ReadJsonObjectAsync<T>()
 		{
 			using (var stream = await Request.Content.ReadAsStreamAsync())
+			//using(var gzipStream = new GZipStream(stream, CompressionMode.Decompress))
 			using (var streamReader = new StreamReader(stream, GetRequestEncoding()))
 			{
 				using (var jsonReader = new JsonTextReader(streamReader))
@@ -315,15 +318,14 @@ namespace Raven.Database.Server.Controllers
 		{
 			if (string.IsNullOrWhiteSpace(etag))
 				return;
-			string clientVersion = GetHeader("Raven-Client-Version");
+			//string clientVersion = GetHeader("Raven-Client-Version");
+			//if (string.IsNullOrEmpty(clientVersion))
+			//{
+			//	msg.Headers.ETag = new EntityTagHeaderValue(etag);
+			//	return;
+			//}
 
-			if (string.IsNullOrEmpty(clientVersion))
-			{
-				msg.Headers.Add("ETag", etag);
-				return;
-			}
-
-			msg.Headers.Add("ETag", "\"" + etag + "\"");
+			msg.Headers.ETag = new EntityTagHeaderValue("\"" + etag + "\"");
 		}
 
 		public void WriteHeaders(RavenJObject headers, Etag etag, HttpResponseMessage msg)
@@ -343,16 +345,16 @@ namespace Raven.Database.Server.Controllers
 						{
 							var rfc1123 = GetDateString(header.Value, "r");
 							var iso8601 = GetDateString(header.Value, "o");
-							msg.Headers.Add(header.Key, rfc1123);
+							msg.Content.Headers.Add(header.Key, rfc1123);
 							if (header.Key.StartsWith("Raven-") == false)
 							{
-								msg.Headers.Add("Raven-" + header.Key, iso8601);
+								msg.Content.Headers.Add("Raven-" + header.Key, iso8601);
 							}
 						}
 						else
 						{
 							var value = UnescapeStringIfNeeded(header.Value.ToString(Formatting.None));
-							msg.Headers.Add(header.Key, value);
+							msg.Content.Headers.Add(header.Key, value);
 						}
 						break;
 				}
@@ -360,7 +362,7 @@ namespace Raven.Database.Server.Controllers
 			if (headers["@Http-Status-Code"] != null)
 			{
 				msg.StatusCode = (HttpStatusCode)headers.Value<int>("@Http-Status-Code");
-				msg.Headers.Add("Temp-Status-Description", headers.Value<string>("@Http-Status-Description"));
+				msg.Content.Headers.Add("Temp-Status-Description", headers.Value<string>("@Http-Status-Description"));
 			}
 
 			WriteETag(etag, msg);
@@ -428,11 +430,11 @@ namespace Raven.Database.Server.Controllers
 			{
 				str = jsonp + "(" + str + ");";
 				
-				msg.Headers.Add("Content-Type", "application/javascript; charset=utf-8");
+				msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/javascript; charset=utf-8");
 			}
 			else
 			{
-				msg.Headers.Add("Content-Type", "application/json; charset=utf-8");
+				msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json; charset=utf-8");
 			}
 
 			return WriteData(DefaultEncoding.GetBytes(str), headers, etag, msg);

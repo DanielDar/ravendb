@@ -7,11 +7,11 @@ using Raven.Database.Queries;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("suggest")]
-	[RoutePrefix("databases/{databaseName}/suggest")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class SuggestionController : RavenApiController
 	{
-		[HttpGet("{id}")]
+		[HttpGet("suggest/{*id}")]
 		public HttpResponseMessage SuggestGet(string id)
 		{
 			var index = id;

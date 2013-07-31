@@ -12,11 +12,11 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("docs")]
-	[RoutePrefix("databases/{databaseName}/docs")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class DocumentsController : RavenApiController
 	{
-		[HttpGet("")]
+		[HttpGet("docs")]
 		public HttpResponseMessage DocsGet()
 		{
 			long documentsCount = 0;
@@ -45,7 +45,7 @@ namespace Raven.Database.Server.Controllers
 			return msg;
 		}
 
-		[HttpPost("")]
+		[HttpPost("docs")]
 		public async Task<HttpResponseMessage> DocsPut()
 		{
 			var json = await ReadJsonAsync();
@@ -57,7 +57,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(id);
 		}
 
-		[HttpHead("{id}")]
+		[HttpHead("docs/{*id}")]
 		public HttpResponseMessage DocHead(string id)
 		{
 			var msg = new HttpResponseMessage(HttpStatusCode.OK);
@@ -89,12 +89,12 @@ namespace Raven.Database.Server.Controllers
 			return msg;
 		}
 
-		[HttpGet("{id}")]
+		[HttpGet("docs/{*id}")]
 		public HttpResponseMessage DocGet(string id)
 		{
 			var docId = id;
 			var msg = new HttpResponseMessage(HttpStatusCode.OK);
-			msg.Headers.Add("Content-Type", "application/json; charset=utf-8");
+			msg.Headers.TryAddWithoutValidation("Content-Type", "application/json; charset=utf-8");
 			if (string.IsNullOrEmpty(GetQueryStringValue("If-None-Match")))
 				return GetDocumentDirectly(docId, msg);
 
@@ -125,7 +125,7 @@ namespace Raven.Database.Server.Controllers
 			return msg;
 		}
 
-		[HttpDelete("{id}")]
+		[HttpDelete("docs/{*id}")]
 		public HttpResponseMessage DocDelete(string id)
 		{
 			var docId = id;
@@ -133,7 +133,7 @@ namespace Raven.Database.Server.Controllers
 			return new HttpResponseMessage(HttpStatusCode.NoContent);
 		}
 
-		[HttpPut("{id}")]
+		[HttpPut("docs/{*id}")]
 		public async Task<HttpResponseMessage> DocPut(string id)
 		{
 			var docId = id;
@@ -142,7 +142,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(putResult, HttpStatusCode.Created);
 		}
 
-		[HttpPatch("{id}")]
+		[HttpPatch("docs/{*id}")]
 		public async Task<HttpResponseMessage> DocPatch(string id)
 		{
 			var docId = id;
@@ -152,7 +152,7 @@ namespace Raven.Database.Server.Controllers
 			return ProcessPatchResult(docId, patchResult.PatchResult, null, null);
 		}
 
-		[HttpEval("id")]
+		[HttpEval("docs/{*id}")]
 		public async Task<HttpResponseMessage> DocEval(string id)
 		{
 			var docId = id;

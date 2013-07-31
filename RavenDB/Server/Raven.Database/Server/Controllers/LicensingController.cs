@@ -4,10 +4,10 @@ using Raven.Database.Commercial;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("license")]
+	[RoutePrefix("")]
 	public class LicensingController : RavenApiController
 	{
-		[HttpGet("status")]
+		[HttpGet("license/status")]
 		public HttpResponseMessage LicenseStatusGet()
 		{
 			return GetMessageWithObject(ValidateLicense.CurrentLicense);				

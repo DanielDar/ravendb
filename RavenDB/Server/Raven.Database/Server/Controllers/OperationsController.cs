@@ -4,10 +4,10 @@ using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("operation")]
+	[RoutePrefix("")]
 	public class OperationsController : RavenApiController
 	{
-		[HttpGet("status")]
+		[HttpGet("operation/status")]
 		public HttpResponseMessage OperationStatusGet()
 		{
 			var idStr = GetQueryStringValue("id");

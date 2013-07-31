@@ -11,17 +11,17 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("queries")]
-	[RoutePrefix("databases/{databaseName}/queries")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class QueriesController : RavenApiController
 	{
-		[HttpGet("")]
+		[HttpGet("queries")]
 		public Task<HttpResponseMessage> QueriesGet(bool isGet)
 		{
 			return GetQueriesResponse(true);
 		}
 
-		[HttpPost("")]
+		[HttpPost("queries")]
 		public Task<HttpResponseMessage> QueriesPost(bool isGet)
 		{
 			return GetQueriesResponse(false);

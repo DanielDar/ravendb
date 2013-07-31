@@ -4,10 +4,10 @@ using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("identity")]
+	[RoutePrefix("")]
 	public class IdentityController: RavenApiController
 	{
-		[HttpPost("")]
+		[HttpPost("identity")]
 		public HttpResponseMessage IdentityNextPost()
 		{
 			var name = GetQueryStringValue("name");

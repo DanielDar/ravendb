@@ -9,10 +9,10 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers.Admin
 {
-	[RoutePrefix("admin/databases")]
+	[RoutePrefix("")]
 	public class AdminDatabasesController : BaseAdminController
 	{
-		[HttpGet("{id}")]
+		[HttpGet("admin/databases/{*id}")]
 		public HttpResponseMessage DatabasesGet(string id)
 		{
 			var docKey = "Raven/Databases/" + id;
@@ -27,7 +27,7 @@ namespace Raven.Database.Server.Controllers.Admin
 			return GetMessageWithObject(dbDoc);
 		}
 
-		[HttpPut("{id}")]
+		[HttpPut("admin/databases/{*id}")]
 		public async Task DatabasesPut(string id)
 		{
 			var docKey = "Raven/Databases/" + id;
@@ -39,7 +39,7 @@ namespace Raven.Database.Server.Controllers.Admin
 			Database.Put(docKey, null, json, new RavenJObject(), null);
 		}
 
-		[HttpDelete("{id}")]
+		[HttpDelete("admin/databases/{*id}")]
 		public void DatabasesDelete(string id)
 		{
 			var docKey = "Raven/Databases/" + id;

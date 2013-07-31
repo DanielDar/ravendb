@@ -14,10 +14,10 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers.Admin
 {
-	[RoutePrefix("admin")]
+	[RoutePrefix("")]
 	public class AdminController : BaseAdminController
 	{
-		[HttpPost("backup")]
+		[HttpPost("admin/backup")]
 		public async Task<HttpResponseMessage> Backup()
 		{
 			var backupRequest = await ReadJsonObjectAsync<BackupRequest>();
@@ -38,7 +38,7 @@ namespace Raven.Database.Server.Controllers.Admin
 			}
 		}
 
-		[HttpGet("restore")]
+		[HttpGet("admin/restore")]
 		public async Task<HttpResponseMessage> Restore()
 		{
 			if (EnsureSystemDatabase() == false)
@@ -158,7 +158,7 @@ namespace Raven.Database.Server.Controllers.Admin
 			return Path.Combine(baseDataPath, documentDataDir.Substring(2));
 		}
 
-		[HttpGet("changedbid")]
+		[HttpGet("admin/changedbid")]
 		public HttpResponseMessage ChangeDbId()
 		{
 			Guid old = Database.TransactionalStorage.Id;
@@ -171,7 +171,7 @@ namespace Raven.Database.Server.Controllers.Admin
 			});
 		}
 
-		[HttpGet("compact")]
+		[HttpGet("admin/compact")]
 		public HttpResponseMessage Compact()
 		{
 			EnsureSystemDatabase();
@@ -189,19 +189,19 @@ namespace Raven.Database.Server.Controllers.Admin
 			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 
-		[HttpGet("indexingStatus")]
+		[HttpGet("admin/indexingStatus")]
 		public HttpResponseMessage IndexingStatus()
 		{
 			return GetMessageWithObject(new {IndexingStatus = Database.WorkContext.RunIndexing ? "Indexing" : "Paused"});		
 		}
 
-		[HttpGet("optimize")]
+		[HttpGet("admin/optimize")]
 		public void Optimize()
 		{
 			Database.IndexStorage.MergeAllIndexes();			
 		}
 
-		[HttpGet("startIndexing")]
+		[HttpGet("admin/startIndexing")]
 		public void StartIndexing()
 		{
 			var concurrency = Request.RequestUri.ParseQueryString()["concurrency"];
@@ -214,7 +214,7 @@ namespace Raven.Database.Server.Controllers.Admin
 			Database.SpinIndexingWorkers();
 		}
 
-		[HttpGet("stopIndexing")]
+		[HttpGet("admin/stopIndexing")]
 		public void StopIndexing()
 		{
 			Database.StopIndexingWorkers();			
@@ -229,8 +229,8 @@ namespace Raven.Database.Server.Controllers.Admin
 			return GetMessageWithObject(DatabasesLandlord.SystemDatabase.Statistics);
 		}
 
-		[HttpGet("gc")]
-		[HttpPost("gc")]
+		[HttpGet("admin/gc")]
+		[HttpPost("admin/gc")]
 		public void Gc()
 		{
 			EnsureSystemDatabase();

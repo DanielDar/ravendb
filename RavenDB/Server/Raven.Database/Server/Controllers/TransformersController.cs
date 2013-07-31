@@ -8,11 +8,11 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("transformers")]
-	[RoutePrefix("databases/{databaseName}/transformers")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class TransformersController :RavenApiController
 	{
-		[HttpGet("{id}")]
+		[HttpGet("transformers/{*id}")]
 		public HttpResponseMessage TransformerGet(string id)
 		{
 			var transformer = id;
@@ -27,7 +27,7 @@ namespace Raven.Database.Server.Controllers
 			return new HttpResponseMessage();
 		}
 
-		[HttpGet("")]
+		[HttpGet("transformers")]
 		public HttpResponseMessage TransformerGet()
 		{
 			var namesOnlyString = GetQueryStringValue("namesOnly");
@@ -41,7 +41,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(transformers);
 		}
 
-		[HttpPut("{id}")]
+		[HttpPut("transformers/{*id}")]
 		public async Task<HttpResponseMessage> TransformersPut(string id)
 		{
 			var transformer = id;
@@ -66,7 +66,7 @@ namespace Raven.Database.Server.Controllers
 			}
 		}
 
-		[HttpDelete("{id}")]
+		[HttpDelete("transformers/{*id}")]
 		public HttpResponseMessage TransformersDelete(string id)
 		{
 			Database.DeleteTransfom(id);

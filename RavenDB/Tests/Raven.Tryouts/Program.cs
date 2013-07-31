@@ -17,29 +17,12 @@ namespace Raven.Tryouts
 		{
 			using (var store = new DocumentStore
 			{
-				DefaultDatabase = "nw",
+				DefaultDatabase = "1",
 				Url = "http://localhost:8080"
 			}.Initialize())
+			using (var session = store.OpenSession())
 			{
-				var company = "companies/1";
-				using (var session = store.OpenSession())
-				{
-					var result = session.Query<OrderTotalResult>("Orders/Totals")
-					       .Where(x => x.Company == company)
-					       .AggregateBy(x => x.Employee,"Sales By Employee")
-					       .SumOn(x => x.Total)
-					       .ToList();
-
-					foreach (var facetResult in result.Results)
-					{
-						Console.WriteLine(facetResult.Key);
-						foreach (var singleResult in facetResult.Value.Values)
-						{
-							Console.WriteLine("\t{0}: {1}", singleResult.Range, singleResult.Sum);
-						}
-					}
-
-				}
+				new RavenDocumentsByEntityName().Execute(store);
 			}
 		}
 	}

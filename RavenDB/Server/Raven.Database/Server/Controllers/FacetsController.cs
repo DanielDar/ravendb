@@ -16,16 +16,16 @@ using Raven.Imports.Newtonsoft.Json;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("facets")]
+	[RoutePrefix("")]
 	public class FacetsController : RavenApiController
 	{
-		[HttpGet("{id}")]
+		[HttpGet("facets/{*id}")]
 		public async Task<HttpResponseMessage> FacetsGet(string id)
 		{
 			return await Facets(id, "GET");
 		}
 
-		[HttpPost("{id}")]
+		[HttpPost("facets/{*id}")]
 		public async Task<HttpResponseMessage> FacetsPost(string id)
 		{
 			return await Facets(id, "POST");

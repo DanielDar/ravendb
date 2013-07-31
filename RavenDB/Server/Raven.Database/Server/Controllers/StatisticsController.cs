@@ -3,12 +3,12 @@ using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("stats")]
-	[RoutePrefix("databases/{databaseName}/stats")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class StatisticsController : RavenApiController
 	{
-		[HttpGet("")]
-		public HttpResponseMessage StatsGet()
+		[HttpGet("stats")]
+		public HttpResponseMessage Get()
 		{
 			return GetMessageWithObject(Database.Statistics);			
 		}

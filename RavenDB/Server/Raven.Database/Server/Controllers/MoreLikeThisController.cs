@@ -8,10 +8,10 @@ using Raven.Database.Queries;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("morelikethis")]
+	[RoutePrefix("")]
 	public class MoreLikeThisController : RavenApiController
 	{
-		[HttpGet("{id}")]
+		[HttpGet("morelikethis/{*id}")]
 		public HttpResponseMessage MoreLikeThisGet()
 		{
 			var nameValueCollection = new NameValueCollection();
@@ -83,8 +83,6 @@ namespace Raven.Database.Server.Controllers
 
 			return results;
 		}
-
-
 	}
 
 	internal static class StringConverter

@@ -17,11 +17,11 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("streams")]
-	[RoutePrefix("databases/{databaseName}/streams")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class StreamsController : RavenApiController
 	{
-		[HttpGet("docs")]
+		[HttpGet("streams/docs")]
 		public HttpResponseMessage StreamDocsGet()
 		{
 			var start = GetStart();
@@ -110,9 +110,8 @@ namespace Raven.Database.Server.Controllers
 			}
 		}
 
-
-		[HttpGet("query/{id}")]
-		[HttpHead("query/{id}")]
+		[HttpGet("streams/query/{*id}")]
+		[HttpHead("streams/query/{*id}")]
 		public HttpResponseMessage SteamQueryGet(string id)
 		{
 			var msg = new HttpResponseMessage(HttpStatusCode.OK);
@@ -138,8 +137,6 @@ namespace Raven.Database.Server.Controllers
 				return new ExcelOutputWriter(msg, stream);
 			return new JsonOutputWriter(stream);
 		}
-
-
 
 		public interface IOutputWriter : IDisposable
 		{

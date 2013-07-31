@@ -5,10 +5,10 @@ using Raven.Abstractions.Extensions;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("static")]
+	[RoutePrefix("")]
 	public class StaticController : RavenApiController
 	{
-		[HttpGet("")]
+		[HttpGet("static")]
 		public HttpResponseMessage StaticGet()
 		{
 			var array = Database.GetAttachments(GetStart(),
@@ -20,7 +20,7 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(array);
 		}
 
-		[HttpGet("id")]
+		[HttpGet("static/{*id}")]
 		public HttpResponseMessage StaticGet(string id)
 		{
 			var filename = id;
@@ -49,7 +49,7 @@ namespace Raven.Database.Server.Controllers
 			return result;
 		}
 
-		[HttpHead("id")]
+		[HttpHead("static/{*id}")]
 		public HttpResponseMessage StaticHead(string id)
 		{
 			var filename = id;
@@ -76,7 +76,7 @@ namespace Raven.Database.Server.Controllers
 			return result;
 		}
 
-		[HttpPut("id")]
+		[HttpPut("static/{*id}")]
 		public HttpResponseMessage StaticPut(string id)
 		{
 			var filename = id;
@@ -89,7 +89,7 @@ namespace Raven.Database.Server.Controllers
 			return new HttpResponseMessage(HttpStatusCode.NoContent);
 		}
 
-		[HttpPost("id")]
+		[HttpPost("static/{*id}")]
 		public HttpResponseMessage StaticPost(string id)
 		{
 			var filename = id;
@@ -100,7 +100,7 @@ namespace Raven.Database.Server.Controllers
 			return msg;
 		}
 
-		[HttpDelete("id")]
+		[HttpDelete("static/{*id}")]
 		public HttpResponseMessage StaticDelete(string id)
 		{
 			var filename = id;

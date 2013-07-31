@@ -13,10 +13,10 @@ using Raven.Json.Linq;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("bulk_docs")]
+	[RoutePrefix("")]
 	public class DocumentsBatchController : RavenApiController
 	{
-		[HttpPost("")]
+		[HttpPost("bulk_docs/")]
 		public async Task<HttpResponseMessage> BulkPost()
 		{
 			var jsonCommandArray = await ReadJsonArrayAsync();
@@ -46,14 +46,14 @@ namespace Raven.Database.Server.Controllers
 			return GetMessageWithObject(batchResult);
 		}
 
-		[HttpDelete("{id}")]
+		[HttpDelete("bulk_docs/{id}")]
 		public HttpResponseMessage BulkDelete(string id)
 		{
 			var databaseBulkOperations = new DatabaseBulkOperations(Database, GetRequestTransaction());
 			return OnBulkOperation(databaseBulkOperations.DeleteByIndex, id);			
 		}
 
-		[HttpPatch("{id}")]
+		[HttpPatch("bulk_docs/{id}")]
 		public async Task<HttpResponseMessage> BulkPatch(string id)
 		{
 			var databaseBulkOperations = new DatabaseBulkOperations(Database, GetRequestTransaction());
@@ -63,7 +63,7 @@ namespace Raven.Database.Server.Controllers
 				databaseBulkOperations.UpdateByIndex(index, query, patchRequests, allowStale), id);
 		}
 
-		[HttpEval("{id}")]
+		[HttpEval("bulk_docs/{id}")]
 		public async Task<HttpResponseMessage> BulkEval(string id)
 		{
 			var databaseBulkOperations = new DatabaseBulkOperations(Database, GetRequestTransaction());

@@ -8,13 +8,13 @@ using Raven.Database.Config;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("multi_get")]
-	[RoutePrefix("databases/{databaseName}/multi_get")]
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class MultiGetController : RavenApiController
 	{
 		private readonly ThreadLocal<bool> recursive = new ThreadLocal<bool>(() => false);
 
-		[HttpPost("")]
+		[HttpPost("multi_get")]
 		public async Task<HttpResponseMessage> MultiGet()
 		{
 			if (recursive.Value)

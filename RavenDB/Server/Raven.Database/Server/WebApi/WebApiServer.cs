@@ -14,6 +14,7 @@ using Raven.Database.Server.Abstractions;
 using Raven.Database.Server.Controllers;
 using Raven.Database.Server.Responders;
 using Raven.Database.Server.Tenancy;
+using Raven.Database.Server.WebApi.Handlers;
 
 namespace Raven.Database.Server.WebApi
 {
@@ -32,7 +33,7 @@ namespace Raven.Database.Server.WebApi
 
 			databasesLandlord = new DatabasesLandlord(documentDatabase);
 
-			config = new RavenSelfHostConfigurations("http://localhost:8080", databasesLandlord);
+			config = new RavenSelfHostConfigurations(configuration.ServerUrl, databasesLandlord);
 			config.Formatters.Remove(config.Formatters.XmlFormatter);
 
 			config.Services.Replace(typeof(IAssembliesResolver), new MyAssemblyResolver());
@@ -42,14 +43,10 @@ namespace Raven.Database.Server.WebApi
 				"API Default", "{controller}/{action}",
 				new { id = RouteParameter.Optional });
 
-			//config.Routes.MapHttpRoute(
-			//	"With Id", "{controller}/{action}/{id}",
-			//	new { id = RouteParameter.Optional });
-
 			config.Routes.MapHttpRoute(
 				"Database Route", "databases/{databaseName}/{controller}/{action}",
 				new { id = RouteParameter.Optional });
-
+			config.MessageHandlers.Add(new GZipToJsonHandler());
 			server = new HttpSelfHostServer(config);			
 		}
 
@@ -76,8 +73,8 @@ namespace Raven.Database.Server.WebApi
 		public void ResetNumberOfRequests()
 		{
 			//TODO: implement method
-			Interlocked.Exchange(ref reqNum, 0);
-			Interlocked.Exchange(ref physicalRequestsCount, 0);
+			//Interlocked.Exchange(ref reqNum, 0);
+			//Interlocked.Exchange(ref physicalRequestsCount, 0);
 //#if DEBUG
 //			while (recentRequests.Count > 0)
 //			{

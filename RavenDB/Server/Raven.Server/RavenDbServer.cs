@@ -41,7 +41,7 @@ namespace Raven.Server
 			{
 				database.SpinBackgroundWorkers();
 				server = new WebApiServer(settings, database);
-				server.StartListening();
+				server.StartListening().Wait();
 			}
 			catch (Exception)
 			{

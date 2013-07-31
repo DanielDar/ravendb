@@ -7,13 +7,13 @@ using Raven.Database.Plugins;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("silverlight")]
+	[RoutePrefix("")]
 	public class SilverlightController : RavenApiController
 	{
 		[ImportMany]
 		public OrderedPartCollection<ISilverlightRequestedAware> SilverlightRequestedAware { get; set; }
 
-		[HttpGet("ensureStartup")]
+		[HttpGet("silverlight/ensureStartup")]
 		public HttpResponseMessage SilverlightEnsureStartup()
 		{
 			Database.ExtensionsState.GetOrAdd("SilverlightUI.NotifiedAboutSilverlightBeingRequested", s =>

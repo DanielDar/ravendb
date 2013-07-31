@@ -5,10 +5,10 @@ using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
 {
-	[RoutePrefix("changes")]
+	[RoutePrefix("")]
 	public class ChangesController : RavenApiController
 	{
-		[HttpGet("config")]
+		[HttpGet("changes/config")]
 		public HttpResponseMessage ChangeConfigGet()
 		{
 			var id = GetQueryStringValue("id");
