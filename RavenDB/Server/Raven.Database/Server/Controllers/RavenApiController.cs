@@ -142,7 +142,8 @@ namespace Raven.Database.Server.Controllers
 
 		public string[] GetQueryStringValues(string key)
 		{
-			return Request.GetQueryNameValuePairs().Where(pair => pair.Key == key).Select(pair => pair.Value).ToArray();			
+			var items = Request.GetQueryNameValuePairs().Where(pair => pair.Key == key);
+			return items.Select(pair => pair.Value).ToArray();			
 		}
 
 		public Etag GetEtagFromQueryString()

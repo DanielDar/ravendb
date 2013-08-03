@@ -16,13 +16,13 @@ namespace Raven.Database.Server.Controllers
 	public class QueriesController : RavenApiController
 	{
 		[HttpGet("queries")]
-		public Task<HttpResponseMessage> QueriesGet(bool isGet)
+		public Task<HttpResponseMessage> QueriesGet()
 		{
 			return GetQueriesResponse(true);
 		}
 
 		[HttpPost("queries")]
-		public Task<HttpResponseMessage> QueriesPost(bool isGet)
+		public Task<HttpResponseMessage> QueriesPost()
 		{
 			return GetQueriesResponse(false);
 		}

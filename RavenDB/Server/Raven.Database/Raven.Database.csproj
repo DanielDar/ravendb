@@ -733,7 +733,6 @@
     <Compile Include="Server\Controllers\RavenApiController.cs" />
     <Compile Include="Server\WebApi\Attributes\HttpEvalAttribute.cs" />
     <Compile Include="Server\WebApi\Attributes\HttpResetAttribute.cs" />
-    <Compile Include="Server\WebApi\Handlers\EncodingDelegateHandler.cs" />
     <Compile Include="Server\WebApi\Handlers\GZipToJsonHandler.cs" />
     <Compile Include="Server\WebApi\RavenSelfHostConfigurations.cs" />
     <Compile Include="Server\WebApi\WebApiServer.cs" />

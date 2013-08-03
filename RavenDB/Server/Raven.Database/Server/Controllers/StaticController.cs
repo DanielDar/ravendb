@@ -38,8 +38,8 @@ namespace Raven.Database.Server.Controllers
 					result = new HttpResponseMessage(HttpStatusCode.NotModified);
 					return;
 				}
-				//TODO: write headers and stream
-				//context.WriteHeaders(attachmentAndHeaders.Metadata, attachmentAndHeaders.Etag);
+				
+				WriteHeaders(attachmentAndHeaders.Metadata, attachmentAndHeaders.Etag, result);
 				//using (var stream = attachmentAndHeaders.Data())
 				//{
 				//	stream.CopyTo(context.Response.OutputStream);

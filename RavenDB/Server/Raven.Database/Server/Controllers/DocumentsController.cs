@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Raven.Abstractions.Data;
@@ -93,8 +94,7 @@ namespace Raven.Database.Server.Controllers
 		public HttpResponseMessage DocGet(string id)
 		{
 			var docId = id;
-			var msg = new HttpResponseMessage(HttpStatusCode.OK);
-			msg.Headers.TryAddWithoutValidation("Content-Type", "application/json; charset=utf-8");
+			var msg = new HttpResponseMessage(HttpStatusCode.OK){Content = new StringContent("")};
 			if (string.IsNullOrEmpty(GetQueryStringValue("If-None-Match")))
 				return GetDocumentDirectly(docId, msg);
 
@@ -182,7 +182,7 @@ namespace Raven.Database.Server.Controllers
 			Debug.Assert(doc.Etag != null);
 			doc.Metadata[Constants.LastModified] = doc.LastModified;
 			doc.Metadata[Constants.DocumentIdFieldName] = Uri.EscapeUriString(doc.Key ?? string.Empty);
-			
+			msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };			
 			return WriteData(doc.DataAsJson, doc.Metadata, doc.Etag,msg: msg);
 		}
 
