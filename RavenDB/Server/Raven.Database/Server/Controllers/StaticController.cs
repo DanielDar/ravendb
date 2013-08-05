@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Http;
+using System.Threading.Tasks;
 using System.Web.Http;
 using Raven.Abstractions.Extensions;
 
@@ -25,7 +26,7 @@ namespace Raven.Database.Server.Controllers
 		{
 			var filename = id;
 			var result = new HttpResponseMessage(HttpStatusCode.OK);
-			Database.TransactionalStorage.Batch(_ => // have to keep the session open for reading of the attachment stream
+			Database.TransactionalStorage.Batch(async _ => // have to keep the session open for reading of the attachment stream
 			{
 				var attachmentAndHeaders = Database.GetStatic(filename);
 				if (attachmentAndHeaders == null)
@@ -40,10 +41,15 @@ namespace Raven.Database.Server.Controllers
 				}
 				
 				WriteHeaders(attachmentAndHeaders.Metadata, attachmentAndHeaders.Etag, result);
-				//using (var stream = attachmentAndHeaders.Data())
-				//{
-				//	stream.CopyTo(context.Response.OutputStream);
-				//}
+				var stream = attachmentAndHeaders.Data();
+				{
+					result.Content = new PushStreamContent((stream1, content, arg3) =>
+					{
+						stream.CopyTo(stream1);
+						stream.Dispose();
+					});
+				//	stream.CopyTo(await Request.Content.ReadAsStreamAsync());
+				}
 			});
 
 			return result;
@@ -68,8 +74,9 @@ namespace Raven.Database.Server.Controllers
 					return;
 				}
 
-				//TODO: writeHeaders
-				//context.WriteHeaders(attachmentAndHeaders.Metadata, attachmentAndHeaders.Etag);
+				
+				WriteHeaders(attachmentAndHeaders.Metadata, attachmentAndHeaders.Etag, result);
+				//TODO: set length
 				//context.Response.ContentLength64 = attachmentAndHeaders.Size;
 			});
 
@@ -77,16 +84,16 @@ namespace Raven.Database.Server.Controllers
 		}
 
 		[HttpPut("static/{*id}")]
-		public HttpResponseMessage StaticPut(string id)
+		public async Task<HttpResponseMessage> StaticPut(string id)
 		{
 			var filename = id;
-			
-			//TODO: fix put params
-			//var newEtag = Database.PutStatic(filename, GetEtag(), context.Request.InputStream, Request.Headers.FilterHeadersAttachment());
 
-			//TODO: write Etag
-			//WriteETag(newEtag);
-			return new HttpResponseMessage(HttpStatusCode.NoContent);
+			var newEtag = Database.PutStatic(filename, GetEtag(), await Request.Content.ReadAsStreamAsync(), Request.Headers.FilterHeadersAttachment());
+
+			var msg = new HttpResponseMessage(HttpStatusCode.NoContent);
+
+			WriteETag(newEtag, msg);
+			return msg;
 		}
 
 		[HttpPost("static/{*id}")]

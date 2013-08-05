@@ -9,6 +9,7 @@ using Raven.Database.Queries;
 namespace Raven.Database.Server.Controllers
 {
 	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class MoreLikeThisController : RavenApiController
 	{
 		[HttpGet("morelikethis/{*id}")]
@@ -43,7 +44,7 @@ namespace Raven.Database.Server.Controllers
 			}
 
 			var msg = GetMessageWithObject(result.Result);
-			msg.Headers.Add("ETag", result.Etag.ToString());
+			WriteETag(result.Etag, msg);
 			return msg;
 		}
 

@@ -114,8 +114,7 @@ namespace Raven.Database.Server.Controllers
 		[HttpHead("streams/query/{*id}")]
 		public HttpResponseMessage SteamQueryGet(string id)
 		{
-			var msg = new HttpResponseMessage(HttpStatusCode.OK);
-			WriteType("application/json; charset=utf-8", msg);
+			var msg = GetMessageWithString("");
 
 			var index = id;
 			var query = GetIndexQuery(int.MaxValue);
@@ -126,6 +125,7 @@ namespace Raven.Database.Server.Controllers
 				query.PageSize = 0;
 
 			msg.Content = new PushStreamContent((stream, content, arg3) => StreamToClientQuery(stream, index, query, isHeadRequest, msg));
+			msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
 
 			return msg;
 		}

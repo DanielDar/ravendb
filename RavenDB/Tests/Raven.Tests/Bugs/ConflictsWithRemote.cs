@@ -43,7 +43,7 @@ namespace Raven.Tests.Bugs
 		}
 
 		[Fact]
-		public void InnefficientMultiThreadedInsert()
+		public void InefficientMultiThreadedInsert()
 		{
 			const int threadCount = 4;
 			var tasks = new List<Task>();

@@ -14,6 +14,7 @@ using Raven.Json.Linq;
 namespace Raven.Database.Server.Controllers
 {
 	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
 	public class DocumentsBatchController : RavenApiController
 	{
 		[HttpPost("bulk_docs/")]

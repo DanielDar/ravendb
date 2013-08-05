@@ -61,8 +61,8 @@ namespace Raven.Database.Server.Controllers
 		[HttpHead("docs/{*id}")]
 		public HttpResponseMessage DocHead(string id)
 		{
-			var msg = new HttpResponseMessage(HttpStatusCode.OK);
-			msg.Headers.Add("Content-Type", "application/json; charset=utf-8");
+			var msg = GetMessageWithString("");
+			msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
 			var docId = id;
 			var transactionInformation = GetRequestTransaction();
 			var documentMetadata = Database.GetDocumentMetadata(docId, transactionInformation);

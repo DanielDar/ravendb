@@ -1,4 +1,5 @@
 ﻿using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Web.Http;
 
 namespace Raven.Database.Server.Controllers
@@ -33,7 +34,7 @@ namespace Raven.Database.Server.Controllers
 				
 			};
 			WriteETag(typeof(HardRouteController).FullName, msg);
-			WriteType("text/xml", msg);
+			msg.Content.Headers.ContentType = new MediaTypeHeaderValue("text/xml");
 			return msg;
 		}
 	}

@@ -402,8 +402,13 @@ namespace Raven.Database.Server.Controllers
 		{
 			var msg = new HttpResponseMessage(code)
 			{
-				Content = new ObjectContent(typeof (object), item, new JsonMediaTypeFormatter())
+				Content = new StringContent(RavenJToken.FromObject(item).ToString())
+				//TODO: change to object content with our own media type formatter
+			//	Content = new ObjectContent(typeof(object), item, new JsonMediaTypeFormatter(), new MediaTypeHeaderValue("application/json"))
 			};
+
+			
+
 			WriteETag(etag, msg);
 
 			return msg;
@@ -431,11 +436,11 @@ namespace Raven.Database.Server.Controllers
 			{
 				str = jsonp + "(" + str + ");";
 				
-				msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/javascript; charset=utf-8");
+				msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/javascript") {CharSet = "utf-8"};
 			}
 			else
 			{
-				msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json; charset=utf-8");
+				msg.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
 			}
 
 			return WriteData(DefaultEncoding.GetBytes(str), headers, etag, msg);
@@ -586,11 +591,6 @@ namespace Raven.Database.Server.Controllers
 		{
 			var rawUrl = Request.RequestUri.AbsoluteUri;
 			return UrlExtension.GetRequestUrlFromRawUrl(rawUrl, DatabasesLandlord.SystemConfiguration);
-		}
-
-		public void WriteType(string type, HttpResponseMessage msg)
-		{
-			msg.Headers.Add("Content-Type", type);
 		}
 	}
 }

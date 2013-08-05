@@ -10,7 +10,7 @@ namespace Raven.Database.Server.Controllers.Admin
 		public override Task<System.Net.Http.HttpResponseMessage> ExecuteAsync(System.Web.Http.Controllers.HttpControllerContext controllerContext, System.Threading.CancellationToken cancellationToken)
 		{
 			// TODO: Verify user is admin
-			if(DateTime.Today > new DateTime(2013,8,1))
+			if(DateTime.Today > new DateTime(2013,8,14))
 					throw new ExpiredSecurityTokenException("HACK EXPIRED error");
 			return base.ExecuteAsync(controllerContext, cancellationToken);
 		}
