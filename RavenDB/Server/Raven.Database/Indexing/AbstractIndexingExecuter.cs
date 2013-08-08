@@ -9,8 +9,8 @@ using Raven.Database.Impl.Synchronization;
 using Raven.Database.Server;
 using Raven.Database.Storage;
 using System.Linq;
-using Task = Raven.Database.Tasks.Task;
 using Raven.Abstractions.Extensions;
+using Raven.Database.Tasks;
 
 namespace Raven.Database.Indexing
 {
@@ -149,7 +149,7 @@ namespace Raven.Database.Indexing
 			// On the face of it, this is stupid, because OOME will not be thrown if the GC could release
 			// memory, but we are actually aware that during indexing, the GC couldn't find garbage to clean,
 			// but in here, we are AFTER the index was done, so there is likely to be a lot of garbage.
-			GC.Collect(GC.MaxGeneration);
+			RavenGC.CollectGarbage(GC.MaxGeneration);
 			autoTuner.OutOfMemoryExceptionHappened();
 		}
 
@@ -158,7 +158,7 @@ namespace Raven.Database.Indexing
 			bool foundWork = false;
 			transactionalStorage.Batch(actions =>
 			{
-				Task task = GetApplicableTask(actions);
+				DatabaseTask task = GetApplicableTask(actions);
 				if (task == null)
 					return;
 
@@ -183,7 +183,7 @@ namespace Raven.Database.Indexing
 			return foundWork;
 		}
 
-		protected abstract Task GetApplicableTask(IStorageActionsAccessor actions);
+		protected abstract DatabaseTask GetApplicableTask(IStorageActionsAccessor actions);
 
 		private void FlushIndexes()
 		{

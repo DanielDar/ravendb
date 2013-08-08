@@ -25,12 +25,13 @@ using Raven.Abstractions.Logging;
 using Raven.Database;
 using Raven.Database.Config;
 using Raven.Database.Server;
-using Raven.Database.Server.Controllers.Admin;
 using Raven.Database.Server.Responders.Admin;
 using Raven.Database.Util;
 
 namespace Raven.Server
 {
+	using Raven.Abstractions.Util;
+
 	public static class Program
 	{
 		static string[] cmdLineArgs;
@@ -62,7 +63,7 @@ namespace Raven.Server
 				}
 				catch (Exception e)
 				{
-					
+
 					EmitWarningInRed();
 
 					WaitForUserInputAndExitWithError(e.ToString(), args);
@@ -304,7 +305,7 @@ namespace Raven.Server
 			else
 			{
 				Console.WriteLine("Error: Could not find the registry key '{0}' in order to disable '{1}' policy.", registryKey,
-				                  policyName);
+								  policyName);
 			}
 		}
 
@@ -491,30 +492,47 @@ Configuration options:
 		{
 			bool? done = null;
 			var actions = new Dictionary<string, Action>
-			{
-				{"cls", TryClearingConsole},
-				{
-					"reset", () =>
-					{
-						TryClearingConsole();
-						done = true;
-					}
-					},
-				{
-					"gc", () =>
-					{
-						long before = Process.GetCurrentProcess().WorkingSet64;
-						Console.WriteLine("Starting garbage collection, current memory is: {0:#,#.##;;0} MB", before / 1024d / 1024d);
-						AdminController.CollectGarbage(server.Database);
-						var after = Process.GetCurrentProcess().WorkingSet64;
-						Console.WriteLine("Done garbage collection, current memory is: {0:#,#.##;;0} MB, saved: {1:#,#.##;;0} MB", after / 1024d / 1024d,
-											(before - after) / 1024d / 1024d);
-					}
-					},
-				{
-					"q", () => done = false
-				}
-			};
+			              {
+				              { "cls", TryClearingConsole },
+				              {
+					              "reset", () =>
+					              {
+						              TryClearingConsole();
+						              done = true;
+					              }
+				              },
+				              {
+					              "gc", () =>
+					              {
+						              long before = Process.GetCurrentProcess().WorkingSet64;
+						              Console.WriteLine(
+										  "Starting garbage collection (without LOH compaction), current memory is: {0:#,#.##;;0} MB",
+							              before / 1024d / 1024d);
+						              RavenGC.CollectGarbage(false, () => server.Database.TransactionalStorage.ClearCaches());
+						              var after = Process.GetCurrentProcess().WorkingSet64;
+						              Console.WriteLine(
+							              "Done garbage collection, current memory is: {0:#,#.##;;0} MB, saved: {1:#,#.##;;0} MB",
+							              after / 1024d / 1024d,
+							              (before - after) / 1024d / 1024d);
+					              }
+				              },
+				              {
+					              "loh-compaction", () =>
+					              {
+						              long before = Process.GetCurrentProcess().WorkingSet64;
+						              Console.WriteLine(
+							              "Starting garbage collection (with LOH compaction), current memory is: {0:#,#.##;;0} MB",
+							              before / 1024d / 1024d);
+									  RavenGC.CollectGarbage(true, () => server.Database.TransactionalStorage.ClearCaches());
+						              var after = Process.GetCurrentProcess().WorkingSet64;
+						              Console.WriteLine(
+							              "Done garbage collection, current memory is: {0:#,#.##;;0} MB, saved: {1:#,#.##;;0} MB",
+							              after / 1024d / 1024d,
+							              (before - after) / 1024d / 1024d);
+					              }
+				              },
+				              { "q", () => done = false }
+			              };
 
 			WriteInteractiveOptions(actions);
 			while (true)

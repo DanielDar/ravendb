@@ -233,6 +233,8 @@
     <Compile Include="Impl\DTC\EsentInFlightTransactionalState.cs" />
     <Compile Include="Impl\DTC\EsentTransactionContext.cs" />
     <Compile Include="Impl\DTC\MuninInFlightTransactionalState.cs" />
+    <Compile Include="Linq\Ast\ThrowOnInvalidMethodCallsInReduce.cs" />
+    <Compile Include="Linq\Ast\TransformFromClauses.cs" />
     <Compile Include="Prefetching\ConcurrentJsonDocumentSortedList.cs" />
     <Compile Include="Prefetching\Prefetcher.cs" />
     <Compile Include="Prefetching\PrefetchingUser.cs" />
@@ -265,6 +267,9 @@
     <Compile Include="Server\Controllers\TermsController.cs" />
     <Compile Include="Server\Controllers\TransactionController.cs" />
     <Compile Include="Server\Controllers\TransformersController.cs" />
+    <Compile Include="Server\Responders\Admin\AdminLohCompaction.cs" />
+    <Compile Include="Server\Responders\Debugging\DebugLists.cs" />
+    <Compile Include="Server\Responders\TransactionPrepare.cs" />
     <Compile Include="Server\Security\Authentication.cs" />
     <Compile Include="Server\Security\AuthenticationForCommercialUseOnly.cs" />
     <Compile Include="Extensions\ConcurrentQueueExtensions.cs" />
@@ -829,7 +834,7 @@
     <Compile Include="Storage\Managed\TasksStorageActions.cs" />
     <Compile Include="Storage\Managed\TransactionalStorage.cs" />
     <Compile Include="Tasks\RemoveFromIndexTask.cs" />
-    <Compile Include="Tasks\Task.cs" />
+    <Compile Include="Tasks\DatabaseTask.cs" />
     <Compile Include="Indexing\IndexStorage.cs" />
     <Compile Include="Util\ActiveEnumerable.cs" />
     <Compile Include="Util\DatabaseMemoryTarget.cs" />

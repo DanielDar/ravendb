@@ -1,47 +1,47 @@
-﻿using System.Collections.Generic;
+//-----------------------------------------------------------------------
+// <copyright file="Queries.cs" company="Hibernating Rhinos LTD">
+//     Copyright (c) Hibernating Rhinos LTD. All rights reserved.
+// </copyright>
+//-----------------------------------------------------------------------
+using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Security.Cryptography;
-using System.Threading.Tasks;
-using System.Web.Http;
 using Raven.Abstractions.Data;
-using Raven.Database.Server.Responders;
+using Raven.Database.Extensions;
+using Raven.Database.Server.Abstractions;
 using Raven.Json.Linq;
 
-namespace Raven.Database.Server.Controllers
+namespace Raven.Database.Server.Responders
 {
-	[RoutePrefix("")]
-	[RoutePrefix("databases/{databaseName}")]
-	public class QueriesController : RavenApiController
+	using Raven.Abstractions.Util.Encryptors;
+
+	public class Queries : AbstractRequestResponder
 	{
-		[HttpGet("queries")]
-		public Task<HttpResponseMessage> QueriesGet()
+		public override string UrlPattern
 		{
-			return GetQueriesResponse(true);
+			get { return "^/queries/?$"; }
 		}
 
-		[HttpPost("queries")]
-		public Task<HttpResponseMessage> QueriesPost()
+		public override string[] SupportedVerbs
 		{
-			return GetQueriesResponse(false);
+			get { return new[] {"POST","GET"}; }
 		}
 
-		private async Task<HttpResponseMessage> GetQueriesResponse(bool isGet)
+		public override void Respond(IHttpContext context)
 		{
 			RavenJArray itemsToLoad;
-			if(isGet == false)
-				itemsToLoad = await ReadJsonArrayAsync();
+			if(context.Request.HttpMethod == "POST")
+				itemsToLoad = context.ReadJsonArray();
 			else
-				itemsToLoad = new RavenJArray(GetQueryStringValues("id").Cast<object>());
+				itemsToLoad = new RavenJArray(context.Request.QueryString.GetValues("id"));
 			var result = new MultiLoadResult();
 			var loadedIds = new HashSet<string>();
-			var includes = GetQueryStringValues("include") ?? new string[0];
-			var transformer = GetQueryStringValue("transformer") ?? GetQueryStringValue("resultTransformer");
+			var includes = context.Request.QueryString.GetValues("include") ?? new string[0];
+			var transformer = context.Request.QueryString["transformer"] ?? context.Request.QueryString["resultTransformer"];
 
-		    var queryInputs = ExtractQueryInputs();
+		    var queryInputs = context.ExtractQueryInputs();
             
-            var transactionInformation = GetRequestTransaction();
+            var transactionInformation = GetRequestTransaction(context);
 		    var includedEtags = new List<byte>();
 			Database.TransactionalStorage.Batch(actions =>
 			{
@@ -76,22 +76,17 @@ namespace Raven.Database.Server.Controllers
 				}
 			});
 
-			Etag computedEtag;
+			var computeHash = Encryptor.Current.Hash.Compute(includedEtags.ToArray());
+			var computedEtag = Etag.Parse(computeHash);
 
-			using (var md5 = MD5.Create())
+			if (context.MatchEtag(computedEtag))
 			{
-				var computeHash = md5.ComputeHash(includedEtags.ToArray());
-				computedEtag = Etag.Parse(computeHash);
+				context.SetStatusToNotModified();
+				return;
 			}
 
-			if (MatchEtag(computedEtag))
-			{
-				return new HttpResponseMessage(HttpStatusCode.NotModified);
-			}
-
-			var msg = GetMessageWithObject(result);
-			WriteETag(computedEtag, msg);
-			return msg;
+			context.WriteETag(computedEtag);
+			context.WriteJson(result);
 		}
 	}
 }

@@ -38,10 +38,10 @@ namespace Raven.Client.Connection
 	/// <summary>
 	/// Access the RavenDB operations using HTTP
 	/// </summary>
-	public class ServerClient : IDatabaseCommands, IAdminDatabaseCommands
+	public class ServerClient : IDatabaseCommands
 	{
 		private readonly string url;
-		private readonly DocumentConvention convention;
+		internal readonly DocumentConvention convention;
 		private readonly ICredentials credentials;
 		private readonly Func<string, ReplicationInformer> replicationInformerGetter;
 		private readonly string databaseName;
@@ -54,6 +54,7 @@ namespace Raven.Client.Connection
 
 		private bool resolvingConflict;
 		private bool resolvingConflictRetries;
+		private readonly AdminServerClient adminServerClient;
 
 		/// <summary>
 		/// Notify when the failover status changed
@@ -86,6 +87,8 @@ namespace Raven.Client.Connection
 			OperationsHeaders = new NameValueCollection();
 			replicationInformer.UpdateReplicationInformationIfNeeded(this);
 			readStripingBase = replicationInformer.GetReadStripingBase();
+
+			adminServerClient = new AdminServerClient(this);
 		}
 
 		/// <summary>
@@ -153,7 +156,7 @@ namespace Raven.Client.Connection
 			});
 		}
 
-		public HttpJsonRequest CreateRequest(string method, string requestUrl, bool disableRequestCompression = false)
+		public HttpJsonRequest CreateRequest(string requestUrl, string method, bool disableRequestCompression = false)
 		{
 			var metadata = new RavenJObject();
 			AddTransactionInformation(metadata);
@@ -162,7 +165,21 @@ namespace Raven.Client.Connection
 			return jsonRequestFactory.CreateHttpJsonRequest(createHttpJsonRequestParams);
 		}
 
-		private void ExecuteWithReplication(string method, Action<string> operation)
+		public HttpJsonRequest CreateReplicationAwareRequest(string currentServerUrl, string requestUrl, string method, bool disableRequestCompression = false)
+		{
+			var metadata = new RavenJObject();
+			AddTransactionInformation(metadata);
+
+			var createHttpJsonRequestParams = new CreateHttpJsonRequestParams(this, (currentServerUrl + requestUrl).NoCache(), method, credentials,
+																			  convention).AddOperationHeaders(OperationsHeaders);
+			createHttpJsonRequestParams.DisableRequestCompression = disableRequestCompression;
+
+			return jsonRequestFactory.CreateHttpJsonRequest(createHttpJsonRequestParams)
+									 .AddReplicationStatusHeaders(url, currentServerUrl, replicationInformer,
+																  convention.FailoverBehavior, HandleReplicationStatusChanges);
+		}
+
+		internal void ExecuteWithReplication(string method, Action<string> operation)
 		{
 			ExecuteWithReplication<object>(method, operationUrl =>
 			{
@@ -171,7 +188,7 @@ namespace Raven.Client.Connection
 			});
 		}
 
-		private T ExecuteWithReplication<T>(string method, Func<string, T> operation)
+		internal T ExecuteWithReplication<T>(string method, Func<string, T> operation)
 		{
 			int currentRequest = convention.IncrementRequestCount();
 			return replicationInformer.ExecuteWithReplication(method, url, currentRequest, readStripingBase, operation);
@@ -376,7 +393,7 @@ namespace Raven.Client.Connection
 				if (httpWebResponse == null ||
 					httpWebResponse.StatusCode != HttpStatusCode.Conflict)
 					throw;
-				throw ThrowConcurrencyException(e);
+				throw FetchConcurrencyException(e);
 			}
 			return SerializationHelper.RavenJObjectsToJsonDocuments(((RavenJArray)responseJson).OfType<RavenJObject>()).ToArray();
 		}
@@ -412,7 +429,7 @@ namespace Raven.Client.Connection
 				if (httpWebResponse == null ||
 					httpWebResponse.StatusCode != HttpStatusCode.Conflict)
 					throw;
-				throw ThrowConcurrencyException(e);
+				throw FetchConcurrencyException(e);
 			}
 			var jsonSerializer = convention.CreateSerializer();
 			return jsonSerializer.Deserialize<PutResult>(new RavenJTokenReader(responseJson));
@@ -660,18 +677,6 @@ namespace Raven.Client.Connection
 				.ToArray();
 		}
 
-		public IDictionary<string, RavenJToken> GetDatabases(int pageSize, int start = 0)
-		{
-			var result = ExecuteGetRequest("".Databases(pageSize, start).NoCache());
-
-			var json = (RavenJArray)result;
-
-			return json
-				.ToDictionary(
-					x =>
-					x.Value<RavenJObject>("@metadata").Value<string>("@id").Replace("Raven/Databases/", string.Empty));
-		}
-
 		private void DirectDeleteAttachment(string key, Etag etag, string operationUrl)
 		{
 			var metadata = new RavenJObject();
@@ -869,11 +874,11 @@ namespace Raven.Client.Connection
 				if (httpWebResponse == null ||
 					httpWebResponse.StatusCode != HttpStatusCode.Conflict)
 					throw;
-				throw ThrowConcurrencyException(e);
+				throw FetchConcurrencyException(e);
 			}
 		}
 
-		private static Exception ThrowConcurrencyException(WebException e)
+		private static Exception FetchConcurrencyException(WebException e)
 		{
 			using (var sr = new StreamReader(e.Response.GetResponseStreamWithHttpDecompression()))
 			{
@@ -1417,7 +1422,7 @@ namespace Raven.Client.Connection
 				if (httpWebResponse == null ||
 					httpWebResponse.StatusCode != HttpStatusCode.Conflict)
 					throw;
-				throw ThrowConcurrencyException(e);
+				throw FetchConcurrencyException(e);
 			}
 			return convention.CreateSerializer().Deserialize<BatchResult[]>(new RavenJTokenReader(response));
 		}
@@ -1593,7 +1598,12 @@ namespace Raven.Client.Connection
 				// Be compitable with the resopnse from v2.0 server
 				var serverBuild = request.ResponseHeaders.GetAsInt("Raven-Server-Build");
 				if (serverBuild < 2500)
-					return null;
+				{
+					if (serverBuild != 13 || (serverBuild == 13 && jsonResponse.Value<long>("OperationId") == default(long)))
+					{
+						return null;
+					}
+				}
 
 				return new Operation(this, jsonResponse.Value<long>("OperationId"));
 			});
@@ -1700,14 +1710,18 @@ namespace Raven.Client.Connection
 
 			return ExecuteWithReplication("GET", operationUrl =>
 			{
-				var requestUri = operationUrl + string.Format("/suggest/{0}?term={1}&field={2}&max={3}&distance={4}&accuracy={5}&popularity={6}",
+				var requestUri = operationUrl + string.Format("/suggest/{0}?term={1}&field={2}&max={3}&popularity={4}",
 													 Uri.EscapeUriString(index),
 													 Uri.EscapeDataString(suggestionQuery.Term),
 													 Uri.EscapeDataString(suggestionQuery.Field),
 													 Uri.EscapeDataString(suggestionQuery.MaxSuggestions.ToInvariantString()),
-													 Uri.EscapeDataString(suggestionQuery.Distance.ToString()),
-													 Uri.EscapeDataString(suggestionQuery.Accuracy.ToInvariantString()),
 													 suggestionQuery.Popularity);
+
+				if (suggestionQuery.Accuracy.HasValue)
+					requestUri += "&accuracy=" + suggestionQuery.Accuracy.Value;
+
+				if (suggestionQuery.Distance.HasValue)
+					requestUri += "&distance=" + suggestionQuery.Distance;
 
 				var request = jsonRequestFactory.CreateHttpJsonRequest(
 					new CreateHttpJsonRequestParams(this, requestUri, "GET", credentials, convention)
@@ -2163,32 +2177,22 @@ namespace Raven.Client.Connection
 			return new DisposableAction(() => servicePoint.Expect100Continue = false);
 		}
 
-		#region IAsyncAdminDatabaseCommands
+		/// <summary>
+		/// Admin operations performed against system database, like create/delete database
+		/// </summary>
+		public IGlobalAdminDatabaseCommands GlobalAdmin
+		{
+			get { return adminServerClient; }
+		}
 
 		/// <summary>
-		/// Admin operations, like create/delete database.
+		/// Admin operations for current database
 		/// </summary>
 		public IAdminDatabaseCommands Admin
 		{
-			get { return (IAdminDatabaseCommands)ForSystemDatabase(); }
+			get { return adminServerClient; }
 		}
 
-		public void CreateDatabase(DatabaseDocument databaseDocument)
-		{
-			if (databaseDocument.Settings.ContainsKey("Raven/DataDir") == false)
-				throw new InvalidOperationException("The Raven/DataDir setting is mandatory");
-
-			var dbname = databaseDocument.Id.Replace("Raven/Databases/", "");
-			MultiDatabase.AssertValidDatabaseName(dbname);
-			var doc = RavenJObject.FromObject(databaseDocument);
-			doc.Remove("Id");
-
-			var req = CreateRequest("PUT", "/admin/databases/" + Uri.EscapeDataString(dbname));
-			req.Write(doc.ToString(Formatting.Indented));
-			req.ExecuteRequest();
-		}
-
-		#endregion
 	}
 }
 #endif
