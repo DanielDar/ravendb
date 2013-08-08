@@ -1,7 +1,8 @@
+using System.Globalization;
+using System.Linq;
 #if !NETFX_CORE
 using System;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 
 #if !SILVERLIGHT
@@ -10,7 +11,6 @@ using System.IO.Compression;
 using Ionic.Zlib;
 #endif
 
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 

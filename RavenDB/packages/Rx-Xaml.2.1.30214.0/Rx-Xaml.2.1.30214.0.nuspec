@@ -21,9 +21,5 @@
       <frameworkAssembly assemblyName="WindowsBase" targetFramework=".NETFramework4.5, .NETFramework4.0" />
       <frameworkAssembly assemblyName="System.Windows" targetFramework="Silverlight5.0, Silverlight4.0-WindowsPhone71" />
     </frameworkAssemblies>
-    <references>
-      <reference file="System.Reactive.Windows.Threading.dll" />
-      <reference file="_._" />
-    </references>
   </metadata>
 </package>

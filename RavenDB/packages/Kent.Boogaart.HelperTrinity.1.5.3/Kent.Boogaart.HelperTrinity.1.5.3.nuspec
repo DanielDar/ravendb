@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>Kent.Boogaart.HelperTrinity</id>
     <version>1.5.3</version>
@@ -10,8 +10,5 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>The Helper Trinity is a set of helper classes applicable to most any .NET application. Using the classes in this library, you can much more easily validate arguments, raise events, and throw exceptions. Online at http://thehelpertrinity.codeplex.com/.</description>
     <tags>.NET helper mono Silverlight argument-checking event-raising exception-raising</tags>
-    <references>
-      <reference file="Kent.Boogaart.HelperTrinity.dll" />
-    </references>
   </metadata>
 </package>
