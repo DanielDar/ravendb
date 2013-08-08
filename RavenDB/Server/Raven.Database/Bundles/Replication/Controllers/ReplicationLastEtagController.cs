@@ -1,38 +1,32 @@
-//-----------------------------------------------------------------------
-// <copyright file="ReplicationLastEtagResponder.cs" company="Hibernating Rhinos LTD">
-//     Copyright (c) Hibernating Rhinos LTD. All rights reserved.
-// </copyright>
-//-----------------------------------------------------------------------
-using System;
-using System.ComponentModel.Composition;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using System.Web.Http;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Extensions;
-using Raven.Abstractions.Logging;
 using Raven.Bundles.Replication.Data;
-using Raven.Database.Extensions;
-using Raven.Database.Server;
-using Raven.Database.Server.Abstractions;
+using Raven.Database.Server.Controllers;
 using Raven.Json.Linq;
 
-namespace Raven.Bundles.Replication.Responders
+namespace Raven.Database.Bundles.Replication.Controllers
 {
-	[ExportMetadata("Bundle", "Replication")]
-	[InheritedExport(typeof(AbstractRequestResponder))]
-	public class ReplicationLastEtagResponder : AbstractRequestResponder
+	public class ReplicationLastEtagController: RavenApiController
 	{
-		private readonly ILog log = LogManager.GetCurrentClassLogger();
-
-		public override void Respond(IHttpContext context)
+		[HttpGet("replication/lastEtag")]
+		public HttpResponseMessage ReplicationLastEtagGet()
 		{
-			var src = context.Request.QueryString["from"];
-			var dbid = context.Request.QueryString["dbid"];
+			var src = GetQueryStringValue("from");
+			var dbid = GetQueryStringValue("dbid");
 			if (dbid == Database.TransactionalStorage.Id.ToString())
 				throw new InvalidOperationException("Both source and target databases have database id = " + dbid + "\r\nDatabase cannot replicate to itself.");
 
 			if (string.IsNullOrEmpty(src))
 			{
-				context.SetStatusToBadRequest();
-				return;
+				return new HttpResponseMessage(HttpStatusCode.BadRequest);
 			}
 
 			while (src.EndsWith("/"))
@@ -40,23 +34,9 @@ namespace Raven.Bundles.Replication.Responders
 
 			if (string.IsNullOrEmpty(src))
 			{
-				context.SetStatusToBadRequest();
-				return;
+				return new HttpResponseMessage(HttpStatusCode.BadRequest);
 			}
 
-			switch (context.Request.HttpMethod)
-			{
-				case "GET":
-					OnGet(context, src);
-					break;
-				case "PUT":
-					OnPut(context, src);
-					break;
-			}
-		}
-
-		private void OnGet(IHttpContext context, string src)
-		{
 			using (Database.DisableAllTriggersForCurrentThread())
 			{
 				var document = Database.Get(Constants.RavenReplicationSourcesBasePath + "/" + src, null);
@@ -78,15 +58,36 @@ namespace Raven.Bundles.Replication.Responders
 					sourceReplicationInformation.ServerInstanceId = serverInstanceId;
 				}
 
-				var currentEtag = context.Request.QueryString["currentEtag"];
-				log.Debug("Got replication last etag request from {0}: [Local: {1} Remote: {2}]", src,
-						  sourceReplicationInformation.LastDocumentEtag, currentEtag);
-				context.WriteJson(sourceReplicationInformation);
+				var currentEtag = GetQueryStringValue("currentEtag");
+				//TODO: log
+				//log.Debug("Got replication last etag request from {0}: [Local: {1} Remote: {2}]", src,
+				//		  sourceReplicationInformation.LastDocumentEtag, currentEtag);
+
+				return GetMessageWithObject(sourceReplicationInformation);
 			}
 		}
 
-		private void OnPut(IHttpContext context, string src)
+		[HttpPut("replication/lastEtag")]
+		public HttpResponseMessage ReplicationLastEtagPut()
 		{
+			var src = GetQueryStringValue("from");
+			var dbid = GetQueryStringValue("dbid");
+			if (dbid == Database.TransactionalStorage.Id.ToString())
+				throw new InvalidOperationException("Both source and target databases have database id = " + dbid + "\r\nDatabase cannot replicate to itself.");
+
+			if (string.IsNullOrEmpty(src))
+			{
+				return new HttpResponseMessage(HttpStatusCode.BadRequest);
+			}
+
+			while (src.EndsWith("/"))
+				src = src.Substring(0, src.Length - 1);// remove last /, because that has special meaning for Raven
+
+			if (string.IsNullOrEmpty(src))
+			{
+				return new HttpResponseMessage(HttpStatusCode.BadRequest);
+			}
+
 			using (Database.DisableAllTriggersForCurrentThread())
 			{
 				var document = Database.Get(Constants.RavenReplicationSourcesBasePath + "/" + src, null);
@@ -96,7 +97,7 @@ namespace Raven.Bundles.Replication.Responders
 				Etag docEtag = null, attachmentEtag = null;
 				try
 				{
-					docEtag = Etag.Parse(context.Request.QueryString["docEtag"]);
+					docEtag = Etag.Parse(GetQueryStringValue("docEtag"));
 				}
 				catch
 				{
@@ -104,7 +105,7 @@ namespace Raven.Bundles.Replication.Responders
 				}
 				try
 				{
-					attachmentEtag = Etag.Parse(context.Request.QueryString["attachmentEtag"]);
+					attachmentEtag = Etag.Parse(GetQueryStringValue("attachmentEtag"));
 				}
 				catch
 				{
@@ -112,12 +113,12 @@ namespace Raven.Bundles.Replication.Responders
 				}
 
 				Guid serverInstanceId;
-				if (Guid.TryParse(context.Request.QueryString["dbid"], out serverInstanceId) == false)
+				if (Guid.TryParse(GetQueryStringValue("dbid"), out serverInstanceId) == false)
 					serverInstanceId = Database.TransactionalStorage.Id;
 
 				if (document == null)
 				{
-					sourceReplicationInformation = new SourceReplicationInformation()
+					sourceReplicationInformation = new SourceReplicationInformation
 					{
 						ServerInstanceId = serverInstanceId,
 						LastAttachmentEtag = attachmentEtag ?? Etag.Empty,
@@ -137,22 +138,16 @@ namespace Raven.Bundles.Replication.Responders
 				var metadata = document == null ? new RavenJObject() : document.Metadata;
 
 				var newDoc = RavenJObject.FromObject(sourceReplicationInformation);
-				log.Debug("Updating replication last etags from {0}: [doc: {1} attachment: {2}]", src,
-								  sourceReplicationInformation.LastDocumentEtag,
-								  sourceReplicationInformation.LastAttachmentEtag);
-		
+
+				//TODO: log
+				//log.Debug("Updating replication last etags from {0}: [doc: {1} attachment: {2}]", src,
+				//				  sourceReplicationInformation.LastDocumentEtag,
+				//				  sourceReplicationInformation.LastAttachmentEtag);
+
 				Database.Put(Constants.RavenReplicationSourcesBasePath + "/" + src, etag, newDoc, metadata, null);
 			}
-		}
 
-		public override string UrlPattern
-		{
-			get { return "^/replication/lastEtag$"; }
-		}
-
-		public override string[] SupportedVerbs
-		{
-			get { return new[] { "GET", "PUT" }; }
+			return new HttpResponseMessage(HttpStatusCode.OK);
 		}
 	}
 }

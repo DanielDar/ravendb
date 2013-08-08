@@ -1,59 +1,59 @@
-//-----------------------------------------------------------------------
-// <copyright file="Queries.cs" company="Hibernating Rhinos LTD">
-//     Copyright (c) Hibernating Rhinos LTD. All rights reserved.
-// </copyright>
-//-----------------------------------------------------------------------
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
+using System.Web.Http;
 using Raven.Abstractions.Data;
-using Raven.Database.Extensions;
-using Raven.Database.Server.Abstractions;
+using Raven.Database.Server.Responders;
 using Raven.Json.Linq;
 
-namespace Raven.Database.Server.Responders
+namespace Raven.Database.Server.Controllers
 {
-	using Raven.Abstractions.Util.Encryptors;
-
-	public class Queries : AbstractRequestResponder
+	[RoutePrefix("")]
+	[RoutePrefix("databases/{databaseName}")]
+	public class QueriesController : RavenApiController
 	{
-		public override string UrlPattern
+		[HttpGet("queries")]
+		public Task<HttpResponseMessage> QueriesGet()
 		{
-			get { return "^/queries/?$"; }
+			return GetQueriesResponse(true);
 		}
 
-		public override string[] SupportedVerbs
+		[HttpPost("queries")]
+		public Task<HttpResponseMessage> QueriesPost()
 		{
-			get { return new[] {"POST","GET"}; }
+			return GetQueriesResponse(false);
 		}
 
-		public override void Respond(IHttpContext context)
+		private async Task<HttpResponseMessage> GetQueriesResponse(bool isGet)
 		{
 			RavenJArray itemsToLoad;
-			if(context.Request.HttpMethod == "POST")
-				itemsToLoad = context.ReadJsonArray();
+			if (isGet == false)
+				itemsToLoad = await ReadJsonArrayAsync();
 			else
-				itemsToLoad = new RavenJArray(context.Request.QueryString.GetValues("id"));
+				itemsToLoad = new RavenJArray(GetQueryStringValues("id").Cast<object>());
 			var result = new MultiLoadResult();
 			var loadedIds = new HashSet<string>();
-			var includes = context.Request.QueryString.GetValues("include") ?? new string[0];
-			var transformer = context.Request.QueryString["transformer"] ?? context.Request.QueryString["resultTransformer"];
+			var includes = GetQueryStringValues("include") ?? new string[0];
+			var transformer = GetQueryStringValue("transformer") ?? GetQueryStringValue("resultTransformer");
 
-		    var queryInputs = context.ExtractQueryInputs();
-            
-            var transactionInformation = GetRequestTransaction(context);
-		    var includedEtags = new List<byte>();
+			var queryInputs = ExtractQueryInputs();
+
+			var transactionInformation = GetRequestTransaction();
+			var includedEtags = new List<byte>();
 			Database.TransactionalStorage.Batch(actions =>
 			{
 				foreach (RavenJToken item in itemsToLoad)
 				{
 					var value = item.Value<string>();
-					if(loadedIds.Add(value)==false)
+					if (loadedIds.Add(value) == false)
 						continue;
 					JsonDocument documentByKey = string.IsNullOrEmpty(transformer)
-				                        ? Database.Get(value, transactionInformation)
-                                        : Database.GetWithTransformer(value, transformer, transactionInformation, queryInputs);
-				    if (documentByKey == null)
+										? Database.Get(value, transactionInformation)
+										: Database.GetWithTransformer(value, transformer, transactionInformation, queryInputs);
+					if (documentByKey == null)
 						continue;
 					result.Results.Add(documentByKey.ToJson());
 
@@ -76,17 +76,22 @@ namespace Raven.Database.Server.Responders
 				}
 			});
 
-			var computeHash = Encryptor.Current.Hash.Compute(includedEtags.ToArray());
-			var computedEtag = Etag.Parse(computeHash);
+			Etag computedEtag;
 
-			if (context.MatchEtag(computedEtag))
+			using (var md5 = MD5.Create())
 			{
-				context.SetStatusToNotModified();
-				return;
+				var computeHash = md5.ComputeHash(includedEtags.ToArray());
+				computedEtag = Etag.Parse(computeHash);
 			}
 
-			context.WriteETag(computedEtag);
-			context.WriteJson(result);
+			if (MatchEtag(computedEtag))
+			{
+				return new HttpResponseMessage(HttpStatusCode.NotModified);
+			}
+
+			var msg = GetMessageWithObject(result);
+			WriteETag(computedEtag, msg);
+			return msg;
 		}
 	}
 }

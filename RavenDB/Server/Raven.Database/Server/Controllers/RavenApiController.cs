@@ -23,6 +23,7 @@ using Raven.Database.Server.Tenancy;
 using Raven.Database.Server.WebApi;
 using System.Linq;
 using Raven.Imports.Newtonsoft.Json;
+using Raven.Imports.Newtonsoft.Json.Bson;
 using Raven.Imports.Newtonsoft.Json.Linq;
 using Raven.Json.Linq;
 
@@ -87,6 +88,16 @@ namespace Raven.Database.Server.Controllers
 			using (var stream = await Request.Content.ReadAsStreamAsync())
 			using (var streamReader = new StreamReader(stream, GetRequestEncoding()))
 				return streamReader.ReadToEnd();
+		}
+
+		public async Task<RavenJArray> ReadBsonArrayAsync()
+		{
+			using (var stream = await Request.Content.ReadAsStreamAsync())
+			using (var jsonReader = new BsonReader(stream))
+			{
+				var jObject = RavenJObject.Load(jsonReader);
+				return new RavenJArray(jObject.Values<RavenJToken>());
+			}
 		}
 
 		private Encoding GetRequestEncoding()
