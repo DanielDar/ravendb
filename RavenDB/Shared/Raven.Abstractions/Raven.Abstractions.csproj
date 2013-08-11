@@ -113,6 +113,7 @@
     <Compile Include="Data\Alert.cs" />
     <Compile Include="Data\AlertsDocument.cs" />
     <Compile Include="Data\ApiKeyDefinition.cs" />
+    <Compile Include="Data\FailoverServers.cs" />
     <Compile Include="Data\HighlightedField.cs" />
     <Compile Include="Data\BulkInsertOptions.cs" />
     <Compile Include="Data\Etag.cs" />
@@ -276,9 +277,16 @@
     <Compile Include="Util\ConcurrentSet.cs" />
     <Compile Include="Util\DocumentHelpers.cs" />
     <Compile Include="Util\EasyReaderWriterLock.cs" />
+    <Compile Include="Util\Encryptors\DefaultEncryptor.cs" />
+    <Compile Include="Util\Encryptors\Encryptor.cs" />
+    <Compile Include="Util\Encryptors\EncryptorBase.cs" />
+    <Compile Include="Util\Encryptors\FipsEncryptor.cs" />
+    <Compile Include="Util\Encryptors\HashEncryptorBase.cs" />
+    <Compile Include="Util\Encryptors\IEncryptor.cs" />
     <Compile Include="Util\EtagUtil.cs" />
     <Compile Include="Util\IAsyncEnumerator.cs" />
     <Compile Include="Util\IncludesUtil.cs" />
+    <Compile Include="Util\RavenGC.cs" />
     <Compile Include="Util\RavenQuery.cs" />
     <Compile Include="Util\SizeLimitedConcurrentDictionary.cs" />
     <Compile Include="Util\SizeLimitedConcurrentSet.cs" />

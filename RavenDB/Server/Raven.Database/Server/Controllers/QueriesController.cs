@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -30,7 +30,7 @@ namespace Raven.Database.Server.Controllers
 		private async Task<HttpResponseMessage> GetQueriesResponse(bool isGet)
 		{
 			RavenJArray itemsToLoad;
-			if(isGet == false)
+			if (isGet == false)
 				itemsToLoad = await ReadJsonArrayAsync();
 			else
 				itemsToLoad = new RavenJArray(GetQueryStringValues("id").Cast<object>());
@@ -39,21 +39,21 @@ namespace Raven.Database.Server.Controllers
 			var includes = GetQueryStringValues("include") ?? new string[0];
 			var transformer = GetQueryStringValue("transformer") ?? GetQueryStringValue("resultTransformer");
 
-		    var queryInputs = ExtractQueryInputs();
-            
-            var transactionInformation = GetRequestTransaction();
-		    var includedEtags = new List<byte>();
+			var queryInputs = ExtractQueryInputs();
+
+			var transactionInformation = GetRequestTransaction();
+			var includedEtags = new List<byte>();
 			Database.TransactionalStorage.Batch(actions =>
 			{
 				foreach (RavenJToken item in itemsToLoad)
 				{
 					var value = item.Value<string>();
-					if(loadedIds.Add(value)==false)
+					if (loadedIds.Add(value) == false)
 						continue;
 					JsonDocument documentByKey = string.IsNullOrEmpty(transformer)
-				                        ? Database.Get(value, transactionInformation)
-                                        : Database.GetWithTransformer(value, transformer, transactionInformation, queryInputs);
-				    if (documentByKey == null)
+										? Database.Get(value, transactionInformation)
+										: Database.GetWithTransformer(value, transformer, transactionInformation, queryInputs);
+					if (documentByKey == null)
 						continue;
 					result.Results.Add(documentByKey.ToJson());
 

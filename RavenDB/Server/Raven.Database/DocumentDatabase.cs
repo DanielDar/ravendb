@@ -54,9 +54,11 @@ using TransactionInformation = Raven.Abstractions.Data.TransactionInformation;
 
 namespace Raven.Database
 {
-    public class DocumentDatabase : IDisposable
+	using Raven.Abstractions.Util.Encryptors;
+
+	public class DocumentDatabase : IDisposable
     {
-        private readonly InMemoryRavenConfiguration configuration;
+        private InMemoryRavenConfiguration configuration;
 
         [ImportMany]
         public OrderedPartCollection<AbstractRequestResponder> RequestResponders { get; set; }
@@ -106,7 +108,7 @@ namespace Raven.Database
         private long pendingTaskCounter;
         private readonly ConcurrentDictionary<long, PendingTaskAndState> pendingTasks = new ConcurrentDictionary<long, PendingTaskAndState>();
 
-	    private readonly InFlightTransactionalState inFlightTransactionalState;
+	    private InFlightTransactionalState inFlightTransactionalState;
 
         private class PendingTaskAndState
         {
@@ -120,20 +122,20 @@ namespace Raven.Database
         /// </summary>
         public string Name { get; private set; }
 
-        private readonly WorkContext workContext;
-        private readonly IndexingExecuter indexingExecuter;
+        private WorkContext workContext;
+        private IndexingExecuter indexingExecuter;
         public IndexingExecuter IndexingExecuter
         {
             get { return indexingExecuter; }
         }
 
-        private readonly DatabaseEtagSynchronizer etagSynchronizer;
+        private DatabaseEtagSynchronizer etagSynchronizer;
         public DatabaseEtagSynchronizer EtagSynchronizer
         {
             get { return etagSynchronizer; }
         }
 
-		private readonly Prefetcher prefetcher;
+		private Prefetcher prefetcher;
 		public Prefetcher Prefetcher
 		{
 			get { return prefetcher; }
@@ -154,7 +156,7 @@ namespace Raven.Database
         private readonly ThreadLocal<bool> disableAllTriggers = new ThreadLocal<bool>(() => false);
         private System.Threading.Tasks.Task indexingBackgroundTask;
         private System.Threading.Tasks.Task reducingBackgroundTask;
-        private readonly TaskScheduler backgroundTaskScheduler;
+        private TaskScheduler backgroundTaskScheduler;
         private readonly object idleLocker = new object();
 
         private static readonly ILog log = LogManager.GetCurrentClassLogger();
@@ -172,7 +174,10 @@ namespace Raven.Database
                 {
                     validateLicense = new ValidateLicense();
                     validateLicense.Execute(configuration);
+
+					InitializeEncryption(configuration);
                 }
+
                 AppDomain.CurrentDomain.DomainUnload += DomainUnloadOrProcessExit;
                 AppDomain.CurrentDomain.ProcessExit += DomainUnloadOrProcessExit;
 
@@ -250,7 +255,22 @@ namespace Raven.Database
             }
         }
 
-        private void SecondStageInitialization()
+		private static void InitializeEncryption(InMemoryRavenConfiguration configuration)
+		{
+			string fipsAsString;
+			bool fips;
+			if (ValidateLicense.CurrentLicense.Attributes.TryGetValue("fips", out fipsAsString) && bool.TryParse(fipsAsString, out fips))
+			{
+				if (!fips && configuration.UseFips)
+					throw new InvalidOperationException(
+						"Your license does not allow you to use FIPS compliant encryption on the server.");
+			}
+
+			Encryptor.Initialize(configuration.UseFips);
+			Lucene.Net.Support.Cryptography.FIPSCompliant = configuration.UseFips;
+		}
+
+		private void SecondStageInitialization()
         {
             DocumentCodecs.OfType<IRequiresDocumentDatabaseInitialization>()
                 .Concat(PutTriggers.OfType<IRequiresDocumentDatabaseInitialization>())
@@ -1196,15 +1216,13 @@ namespace Raven.Database
                 if (suggestionOption.Distance == StringDistanceTypes.None)
                     continue;
 
-                var indexExtensionKey = MonoHttpUtility.UrlEncode(field + "-" + suggestionOption.Distance + "-" + suggestionOption.Accuracy);
+                var indexExtensionKey = MonoHttpUtility.UrlEncode(field);
 
                 var suggestionQueryIndexExtension = new SuggestionQueryIndexExtension(
                     workContext,
                     Path.Combine(configuration.IndexStoragePath, "Raven-Suggestions", name, indexExtensionKey),
                     configuration.RunInMemory,
-                    SuggestionQueryRunner.GetStringDistance(suggestionOption.Distance),
-                    field,
-                    suggestionOption.Accuracy);
+                    field);
 
                 IndexStorage.SetIndexExtension(name, indexExtensionKey, suggestionQueryIndexExtension);
             }
@@ -1231,12 +1249,21 @@ namespace Raven.Database
         {
             index = IndexDefinitionStorage.FixupIndexName(index);
             var highlightings = new Dictionary<string, Dictionary<string, string[]>>();
-            Func<IndexQueryResult, object> tryRecordHighlighting = queryResult =>
+	        var scoreExplanations = new Dictionary<string, string>();
+
+            Func<IndexQueryResult, object> tryRecordHighlightingAndScoreExplanation = queryResult =>
             {
-                if (queryResult.Highligtings != null && queryResult.Key != null)
-                    highlightings.Add(queryResult.Key, queryResult.Highligtings);
+				if (queryResult.Key != null)
+				{
+					if (queryResult.Highligtings != null)
+						highlightings.Add(queryResult.Key, queryResult.Highligtings);
+					if(queryResult.ScoreExplanation != null)
+						scoreExplanations.Add(queryResult.Key, queryResult.ScoreExplanation);
+				}
+                
                 return null;
             };
+
             var stale = false;
             Tuple<DateTime, Etag> indexTimestamp = Tuple.Create(DateTime.MinValue, Etag.Empty);
             Etag resultEtag = Etag.Empty;
@@ -1289,7 +1316,7 @@ namespace Raven.Database
                                                   let doc = docRetriever.RetrieveDocumentForQuery(queryResult, indexDefinition, fieldsToFetch)
                                                   where doc != null
                                                   let _ = nonAuthoritativeInformation |= (doc.NonAuthoritativeInformation ?? false)
-                                                  let __ = tryRecordHighlighting(queryResult)
+                                                  let __ = tryRecordHighlightingAndScoreExplanation(queryResult)
                                                   select doc, transformerErrors);
 
                     if (headerInfo != null)
@@ -1333,7 +1360,8 @@ namespace Raven.Database
                 IdsToInclude = idsToLoad,
                 LastQueryTime = SystemTime.UtcNow,
                 Highlightings = highlightings,
-				DurationMilliseconds = duration.ElapsedMilliseconds
+				DurationMilliseconds = duration.ElapsedMilliseconds,
+				ScoreExplanations = scoreExplanations
             };
         }
 
@@ -2109,7 +2137,7 @@ namespace Raven.Database
         }
 
         private volatile bool disposed;
-        private readonly ValidateLicense validateLicense;
+        private ValidateLicense validateLicense;
         public string ServerUrl
         {
             get
@@ -2255,43 +2283,40 @@ namespace Raven.Database
                 touchCount = accessor.Staleness.GetIndexTouchCount(indexName);
             });
 
-
             var indexDefinition = GetIndexDefinition(indexName);
             if (indexDefinition == null)
                 return Etag.Empty; // this ensures that we will get the normal reaction of IndexNotFound later on.
-            using (var md5 = MD5.Create())
+
+            var list = new List<byte>();
+            list.AddRange(indexDefinition.GetIndexHash());
+            list.AddRange(Encoding.Unicode.GetBytes(indexName));
+            if (string.IsNullOrWhiteSpace(resultTransformer) == false)
             {
-                var list = new List<byte>();
-                list.AddRange(indexDefinition.GetIndexHash());
-                list.AddRange(Encoding.Unicode.GetBytes(indexName));
-                if (string.IsNullOrWhiteSpace(resultTransformer) == false)
-                {
-                    var abstractTransformer = IndexDefinitionStorage.GetTransformer(resultTransformer);
-                    if (abstractTransformer == null)
-                        throw new InvalidOperationException("The result transformer: " + resultTransformer + " was not found");
-                    list.AddRange(abstractTransformer.GetHashCodeBytes());
-                }
-                list.AddRange(lastDocEtag.ToByteArray());
-                list.AddRange(BitConverter.GetBytes(touchCount));
-                list.AddRange(BitConverter.GetBytes(isStale));
-                if (lastReducedEtag != null)
-                {
-                    list.AddRange(lastReducedEtag.ToByteArray());
-                }
-
-                var indexEtag = Etag.Parse(md5.ComputeHash(list.ToArray()));
-
-                if (previousEtag != null && previousEtag != indexEtag)
-                {
-                    // the index changed between the time when we got it and the time 
-                    // we actually call this, we need to return something random so that
-                    // the next time we won't get 304
-
-                    return Etag.InvalidEtag;
-                }
-
-                return indexEtag;
+                var abstractTransformer = IndexDefinitionStorage.GetTransformer(resultTransformer);
+                if (abstractTransformer == null)
+                    throw new InvalidOperationException("The result transformer: " + resultTransformer + " was not found");
+                list.AddRange(abstractTransformer.GetHashCodeBytes());
             }
+            list.AddRange(lastDocEtag.ToByteArray());
+            list.AddRange(BitConverter.GetBytes(touchCount));
+            list.AddRange(BitConverter.GetBytes(isStale));
+            if (lastReducedEtag != null)
+            {
+                list.AddRange(lastReducedEtag.ToByteArray());
+            }
+
+            var indexEtag = Etag.Parse(Encryptor.Current.Hash.Compute(list.ToArray()));
+
+            if (previousEtag != null && previousEtag != indexEtag)
+            {
+                // the index changed between the time when we got it and the time 
+                // we actually call this, we need to return something random so that
+                // the next time we won't get 304
+
+                return Etag.InvalidEtag;
+            }
+
+            return indexEtag;
         }
 
         public int BulkInsert(BulkInsertOptions options, IEnumerable<IEnumerable<JsonDocument>> docBatches, Guid operationId)

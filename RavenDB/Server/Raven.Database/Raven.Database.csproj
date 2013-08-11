@@ -211,16 +211,20 @@
     <Compile Include="Bundles\Expiration\ExpirationReadTrigger.cs" />
     <Compile Include="Bundles\Expiration\ExpiredDocumentsCleaner.cs" />
     <Compile Include="Bundles\MoreLikeThis\MoreLikeThis.cs" />
+    <Compile Include="Bundles\Replication\Controllers\AdminPurgeTombstonesController.cs" />
+    <Compile Include="Bundles\Replication\Controllers\AdminReplicationInfo.cs" />
+    <Compile Include="Bundles\Replication\Controllers\AttachmentReplicationController.cs" />
+    <Compile Include="Bundles\Replication\Controllers\DocumentReplicationController.cs" />
+    <Compile Include="Bundles\Replication\Controllers\ReplicationHeartbeatController.cs" />
+    <Compile Include="Bundles\Replication\Controllers\ReplicationInfoController.cs" />
+    <Compile Include="Bundles\Replication\Controllers\ReplicationLastEtagController.cs" />
     <Compile Include="Bundles\Replication\Impl\Historian.cs" />
     <Compile Include="Bundles\Replication\Impl\ReplicationData.cs" />
     <Compile Include="Bundles\Replication\Plugins\DefaultAttachmentReplicationConflictResolver.cs" />
     <Compile Include="Bundles\Replication\Plugins\DefaultDocumentReplicationConflictResolver.cs" />
-    <Compile Include="Bundles\Replication\Responders\AdminPurgeTombstones.cs" />
     <Compile Include="Bundles\Replication\Responders\Behaviors\AttachmentReplicationBehavior.cs" />
     <Compile Include="Bundles\Replication\Responders\Behaviors\DocumentReplicationBehavior.cs" />
     <Compile Include="Bundles\Replication\Responders\Behaviors\SingleItemReplicationBehavior.cs" />
-    <Compile Include="Bundles\Replication\Responders\ReplicationHeartbeat.cs" />
-    <Compile Include="Bundles\Replication\Responders\ReplicationInformationResponder.cs" />
     <Compile Include="Bundles\Replication\Tasks\ReplicationStrategy.cs" />
     <Compile Include="Bundles\Replication\Triggers\RemoveConflictOnAttachmentDeleteTrigger.cs" />
     <Compile Include="Bundles\Replication\Triggers\RemoveConflictOnDeleteTrigger.cs" />
@@ -233,6 +237,8 @@
     <Compile Include="Impl\DTC\EsentInFlightTransactionalState.cs" />
     <Compile Include="Impl\DTC\EsentTransactionContext.cs" />
     <Compile Include="Impl\DTC\MuninInFlightTransactionalState.cs" />
+    <Compile Include="Linq\Ast\ThrowOnInvalidMethodCallsInReduce.cs" />
+    <Compile Include="Linq\Ast\TransformFromClauses.cs" />
     <Compile Include="Prefetching\ConcurrentJsonDocumentSortedList.cs" />
     <Compile Include="Prefetching\Prefetcher.cs" />
     <Compile Include="Prefetching\PrefetchingUser.cs" />
@@ -265,6 +271,7 @@
     <Compile Include="Server\Controllers\TermsController.cs" />
     <Compile Include="Server\Controllers\TransactionController.cs" />
     <Compile Include="Server\Controllers\TransformersController.cs" />
+    <Compile Include="Server\Responders\Admin\AdminLohCompaction.cs" />
     <Compile Include="Server\Security\Authentication.cs" />
     <Compile Include="Server\Security\AuthenticationForCommercialUseOnly.cs" />
     <Compile Include="Extensions\ConcurrentQueueExtensions.cs" />
@@ -369,7 +376,6 @@
     <Compile Include="Server\Connections\ConnectionState.cs" />
     <Compile Include="Server\Connections\EventsTransport.cs" />
     <Compile Include="Server\LogContext.cs" />
-    <Compile Include="Bundles\Replication\Responders\AdminReplicationInfo.cs" />
     <Compile Include="Server\Responders\Admin\AdminResponder.cs" />
     <Compile Include="Server\Responders\Debugging\DebugUser.cs" />
     <Compile Include="Bundles\MoreLikeThis\RavenMoreLikeThis.cs" />
@@ -386,9 +392,6 @@
     <Compile Include="Bundles\Replication\Impl\ReplicationHiLo.cs" />
     <Compile Include="Bundles\Replication\Plugins\AbstractAttachmentReplicationConflictResolver.cs" />
     <Compile Include="Bundles\Replication\Plugins\AbstractDocumentReplicationConflictResolver.cs" />
-    <Compile Include="Bundles\Replication\Responders\AttachmentReplicationResponder.cs" />
-    <Compile Include="Bundles\Replication\Responders\DocumentReplicationResponder.cs" />
-    <Compile Include="Bundles\Replication\Responders\ReplicationLastEtagResponder.cs" />
     <Compile Include="Bundles\Replication\Tasks\ReplicationTask.cs" />
     <Compile Include="Bundles\Replication\Triggers\AncestryPutTrigger.cs" />
     <Compile Include="Bundles\Replication\Triggers\AttachmentAncestryPutTrigger.cs" />
@@ -829,7 +832,7 @@
     <Compile Include="Storage\Managed\TasksStorageActions.cs" />
     <Compile Include="Storage\Managed\TransactionalStorage.cs" />
     <Compile Include="Tasks\RemoveFromIndexTask.cs" />
-    <Compile Include="Tasks\Task.cs" />
+    <Compile Include="Tasks\DatabaseTask.cs" />
     <Compile Include="Indexing\IndexStorage.cs" />
     <Compile Include="Util\ActiveEnumerable.cs" />
     <Compile Include="Util\DatabaseMemoryTarget.cs" />

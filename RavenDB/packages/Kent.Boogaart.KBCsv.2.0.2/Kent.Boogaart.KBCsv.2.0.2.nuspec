@@ -27,8 +27,5 @@
         <dependency id="Microsoft.Bcl.Async" version="1.0.16" />
       </group>
     </dependencies>
-    <references>
-      <reference file="Kent.Boogaart.KBCsv.dll" />
-    </references>
   </metadata>
 </package>

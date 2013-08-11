@@ -108,6 +108,7 @@ namespace Raven.Client.Connection
 				}
 
 				webRequest.Headers["Accept-Encoding"] = "gzip";
+				httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Encoding", "gzip");
 			}
 
 			webRequest.ContentType = "application/json; charset=utf-8";
@@ -164,24 +165,15 @@ namespace Raven.Client.Connection
 						{
 							Response = await httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(Method), Url));
 
-							HttpResponseHeaders x = Response.Headers;
-							ResponseHeaders = new NameValueCollection();
-							foreach (var header in Response.Headers)
-							{
-								foreach (var val in header.Value)
-								{
-									ResponseHeaders.Add(header.Key, val);
-								}
-							}
+							SetResponseHeaders(Response);
+
 							ResponseStatusCode = Response.StatusCode;
-
-
 						}
 						finally
 						{
 							sp.Stop();
 						}
-						await CheckForErrors();
+						await this.CheckForErrorsAsync();
 					}
 					return await ReadJsonInternalAsync();
 				}
@@ -209,7 +201,19 @@ namespace Raven.Client.Connection
 			}
 		}
 
-		private async Task CheckForErrors()
+		private void SetResponseHeaders(HttpResponseMessage response)
+		{
+			ResponseHeaders = new NameValueCollection();
+			foreach (var header in response.Headers)
+			{
+				foreach (var val in header.Value)
+				{
+					ResponseHeaders.Add(header.Key, val);
+				}
+			}
+		}
+
+		private async Task CheckForErrorsAsync()
 		{
 			if (Response.IsSuccessStatusCode == false)
 			{
@@ -853,12 +857,14 @@ namespace Raven.Client.Connection
 
 				try
 				{
-					Response = await httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(Method), Url));
+					Response = await httpClient.SendAsync(new HttpRequestMessage(new HttpMethod(Method), Url), HttpCompletionOption.ResponseHeadersRead);
+					
+					await CheckForErrorsAsync();
+					
+					SetResponseHeaders(Response);
+
 					var stream = await Response.GetResponseStreamWithHttpDecompression();
-					var observableLineStream = new ObservableLineStream(stream, () =>
-					{
-						
-					});
+					var observableLineStream = new ObservableLineStream(stream, () => Response.Dispose());
 					observableLineStream.Start();
 					return (IObservable<string>) observableLineStream;
 				}
@@ -912,6 +918,8 @@ namespace Raven.Client.Connection
 
 				if (Response.IsSuccessStatusCode == false)
 					throw new ErrorResponseException(Response);
+
+				SetResponseHeaders(Response);
 			}
 		}
 
@@ -925,6 +933,8 @@ namespace Raven.Client.Connection
 
 			if (Response.IsSuccessStatusCode == false)
 				throw new ErrorResponseException(Response);
+
+			SetResponseHeaders(Response);
 		}
 
 		public Task<Stream> GetRawRequestStream()

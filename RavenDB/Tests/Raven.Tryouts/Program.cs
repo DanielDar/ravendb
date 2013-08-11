@@ -1,157 +1,177 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using Orders;
-using Raven.Abstractions.Data;
-using Raven.Client.Document;
-using Raven.Client.Embedded;
-using Raven.Client.Indexes;
-using Raven.Client;
-
-namespace Raven.Tryouts
+﻿namespace Raven.Tryouts
 {
-	class Program
+
+	using System;
+	using System.Collections.Generic;
+	using System.Linq;
+	using Raven.Client.Document;
+	using Raven.Client.Extensions;
+	using Raven.Client.Indexes;
+
+	public class Program
 	{
-		private static void Main(string[] args)
+		public class Application
 		{
-			using (var store = new DocumentStore
+			public string Id { get; set; }
+			public string Name { get; set; }
+			public string Author { get; set; }
+			public Performance Performance { get; set; }
+		}
+
+		public class Performance
+		{
+			public List<Counter> Counters { get; set; }
+		}
+
+		public class Counter
+		{
+			public string Id { get; set; }
+			public string Name { get; set; }
+			public decimal Value { get; set; }
+			public DateTime DateTime { get; set; }
+		}
+
+		public class ApplicationByAuthor : AbstractIndexCreationTask<Application>
+		{
+			public ApplicationByAuthor()
 			{
-				DefaultDatabase = "1",
-				Url = "http://localhost:8080"
-			}.Initialize())
-			using (var session = store.OpenSession())
-			{
-				new RavenDocumentsByEntityName().Execute(store);
+				Map = applications => from application in applications
+									  select new
+									  {
+										  application.Author
+									  };
 			}
 		}
-	}
 
-	public class OrderTotalResult
-	{
-		public string Employee, Company;
-		public decimal Total;
-	}
-}
+		public class ApplicationByName : AbstractIndexCreationTask<Application>
+		{
+			public ApplicationByName()
+			{
+				Map = applications => from application in applications
+									  select new
+									  {
+										  application.Name
+									  };
+			}
+		}
 
-namespace Orders
-{
-	public class Company
-	{
-		public string Id { get; set; }
-		public string ExternalId { get; set; }
-		public string Name { get; set; }
-		public Contact Contact { get; set; }
-		public Address Address { get; set; }
-		public string Phone { get; set; }
-		public string Fax { get; set; }
-	}
+		public class Counters_Sum : AbstractIndexCreationTask<Application, Counters_Sum.Result>
+		{
+			public class Result
+			{
+				public string CounterName { get; set; }
+				public decimal Value { get; set; }
+			}
 
-	public class Address
-	{
-		public string Line1 { get; set; }
-		public string Line2 { get; set; }
-		public string City { get; set; }
-		public string Region { get; set; }
-		public string PostalCode { get; set; }
-		public string Country { get; set; }
-	}
+			public Counters_Sum()
+			{
+				Map = applications => from application in applications
+									  let performance = application.Performance
+									  from counter in performance.Counters
+									  select new
+									  {
+										  CounterName = counter.Name,
+										  Value = counter.Value
+									  };
+				Reduce = results => from result in results
+									group result by result.CounterName
+										into g
+										select new
+										{
+											CounterName = g.Key,
+											Value = g.Sum(x => x.Value)
+										};
 
-	public class Contact
-	{
-		public string Name { get; set; }
-		public string Title { get; set; }
-	}
+			}
+		}
 
-	public class Category
-	{
-		public string Id { get; set; }
-		public string Name { get; set; }
-		public string Description { get; set; }
-	}
+		public class Counters_Avg : AbstractIndexCreationTask<Application, Counters_Avg.Result>
+		{
+			public class Result
+			{
+				public string CounterName { get; set; }
+				public int Count { get; set; }
+				public decimal AvgValue { get; set; }
+			}
 
-	public class Order
-	{
-		public string Id { get; set; }
-		public string Company { get; set; }
-		public string Employee { get; set; }
-		public DateTime OrderedAt { get; set; }
-		public DateTime RequireAt { get; set; }
-		public DateTime? ShippedAt { get; set; }
-		public Address ShipTo { get; set; }
-		public string ShipVia { get; set; }
-		public decimal Freight { get; set; }
-		public List<OrderLine> Lines { get; set; }
-	}
+			public Counters_Avg()
+			{
+				Map = applications => from application in applications
+									  let performance = application.Performance
+									  from counter in performance.Counters
+									  select new
+									  {
+										  CounterName = counter.Name,
+										  AvgValue = counter.Value,
+										  Count = 1
 
-	public class OrderLine
-	{
-		public string Product { get; set; }
-		public string ProductName { get; set; }
-		public decimal PricePerUnit { get; set; }
-		public int Quantity { get; set; }
-		public decimal Discount { get; set; }
-	}
+									  };
+				Reduce = results => from result in results
+									group result by result.CounterName
+										into g
+										let sum = g.Sum(x => x.Count)
+										select new
+										{
+											CounterName = g.Key,
+											AvgValue = g.Sum(x => x.AvgValue) / sum,
+											Count = sum
+										};
 
-	public class Product
-	{
-		public string Id { get; set; }
-		public string Name { get; set; }
-		public string Supplier { get; set; }
-		public string Category { get; set; }
-		public string QuantityPerUnit { get; set; }
-		public decimal PricePerUser { get; set; }
-		public int UnitsInStock { get; set; }
-		public int UnitsOnOrder { get; set; }
-		public bool Discontinued { get; set; }
-		public int ReorderLevel { get; set; }
-	}
+			}
+		}
 
-	public class Supplier
-	{
-		public string Id { get; set; }
-		public Contact Contact { get; set; }
-		public string Name { get; set; }
-		public Address Address { get; set; }
-		public string Phone { get; set; }
-		public string Fax { get; set; }
-		public string HomePage { get; set; }
-	}
+		private static void Main(string[] args)
+		{
+			using (var store = new DocumentStore { Url = "http://localhost:8080", DefaultDatabase = "Applications" }.Initialize())
+			{
+				store.DatabaseCommands.Admin.EnsureDatabaseExists("Applications");
 
-	public class Employee
-	{
-		public string Id { get; set; }
-		public string LastName { get; set; }
-		public string FirstName { get; set; }
-		public string Title { get; set; }
-		public Address Address { get; set; }
-		public DateTime HiredAt { get; set; }
-		public DateTime Birthday { get; set; }
-		public string HomePhone { get; set; }
-		public string Extension { get; set; }
-		public string ReportsTo { get; set; }
-		public List<string> Notes { get; set; }
+				new ApplicationByAuthor().Execute(store);
+				new ApplicationByName().Execute(store);
+				new Counters_Sum().Execute(store);
+				new Counters_Avg().Execute(store);
 
-		public List<string> Territories { get; set; }
-	}
+				for (int i = 0; i < 50000; i++)
+				{
+					using (var session = store.OpenSession())
+					{
+						for (int j = 0; j < 30; j++)
+						{
+							session.Store(new Application()
+							{
+								Name = "Application/" + (i * j) % 200,
+								Author = "Author/" + (i * j) % 100,
+								Performance = new Performance()
+								{
+									Counters = new List<Counter>()
+									{
+										new Counter()
+										{
+											DateTime = DateTime.Now,
+											Name = "Counter/" + (i * j) % 1000,
+											Value = (i*j) % 10000,
+										},
+										new Counter()
+										{
+											DateTime = DateTime.Now,
+											Name = "Counter/" + (i * j) % 2000,
+											Value = (i*j) % 100,
+										},
+										new Counter()
+										{
+											DateTime = DateTime.Now,
+											Name = "Counter/" + (i * j) % 5000,
+											Value = (i*j) % 500,
+										}
+									}
+								}
+							});
+						}
 
-	public class Region
-	{
-		public string Id { get; set; }
-		public string Name { get; set; }
-		public List<Territory> Territories { get; set; }
-	}
-
-	public class Territory
-	{
-		public string Code { get; set; }
-		public string Name { get; set; }
-	}
-
-	public class Shipper
-	{
-		public string Id { get; set; }
-		public string Name { get; set; }
-		public string Phone { get; set; }
+						session.SaveChanges();
+					}
+				}
+			}
+		}
 	}
 }
