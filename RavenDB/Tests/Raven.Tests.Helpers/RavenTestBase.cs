@@ -336,7 +336,7 @@ namespace Raven.Tests.Helpers
 			}
 		}
 
-		protected void WaitForUserToContinueTheTest(bool debug = true)
+		public static void WaitForUserToContinueTheTest(bool debug = true)
 		{
 			if (debug && Debugger.IsAttached == false)
 				return;

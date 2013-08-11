@@ -31,7 +31,7 @@ namespace Raven.Database.Server.WebApi.Handlers
 				gzipStream.Dispose();
 
 				outputStream.Seek(0, SeekOrigin.Begin);
-			});
+			}, cancellationToken);
 
 			// Wait for inputstream and decompression to complete. Would be nice
 			// to not block here and work async when ready instead, but I couldn't 
