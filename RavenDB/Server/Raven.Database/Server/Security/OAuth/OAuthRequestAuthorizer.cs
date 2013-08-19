@@ -1,44 +1,48 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
 using System.Security.Principal;
 using System.Linq;
+using System.Threading;
+using System.Web;
+using System.Web.Http;
 using Raven.Abstractions.Data;
-using Raven.Database.Server.Abstractions;
-using Raven.Database.Extensions;
+using Raven.Database.Server.Controllers;
 
 namespace Raven.Database.Server.Security.OAuth
 {
 	public class OAuthRequestAuthorizer : AbstractRequestAuthorizer
 	{
-		public bool Authorize(IHttpContext ctx, bool hasApiKey, bool ignoreDbAccess)
+		public bool Authorize(RavenApiController controller, bool hasApiKey, bool ignoreDbAccess)
 		{
-			var httpRequest = ctx.Request;
+		//	var httpRequest = ctx.Request;
 
-			var isGetRequest = IsGetRequest(httpRequest.HttpMethod, httpRequest.Url.AbsolutePath);
+			var isGetRequest = IsGetRequest(controller.Request.Method.Method, controller.Request.RequestUri.AbsolutePath);
 			var allowUnauthenticatedUsers = // we need to auth even if we don't have to, for bundles that want the user 
-				Settings.AnonymousUserAccessMode == AnonymousUserAccessMode.All ||
-				Settings.AnonymousUserAccessMode == AnonymousUserAccessMode.Admin || 
-			        Settings.AnonymousUserAccessMode == AnonymousUserAccessMode.Get &&
+				controller.DatabasesLandlord.SystemConfiguration.AnonymousUserAccessMode == AnonymousUserAccessMode.All ||
+				controller.DatabasesLandlord.SystemConfiguration.AnonymousUserAccessMode == AnonymousUserAccessMode.Admin ||
+					controller.DatabasesLandlord.SystemConfiguration.AnonymousUserAccessMode == AnonymousUserAccessMode.Get &&
 			        isGetRequest;
 
-			var token = GetToken(ctx);
+			var token = GetToken(controller);
 			
 			if (token == null)
 			{
 				if (allowUnauthenticatedUsers)
 					return true;
 
-				WriteAuthorizationChallenge(ctx, hasApiKey ? 412 : 401, "invalid_request", "The access token is required");
+				WriteAuthorizationChallenge(controller, hasApiKey ? 412 : 401, "invalid_request", "The access token is required");
 				
 				return false;
 			}
 
 			AccessTokenBody tokenBody;
-			if (!AccessToken.TryParseBody(Settings.OAuthTokenKey, token, out tokenBody))
+			if (!AccessToken.TryParseBody(controller.DatabasesLandlord.SystemConfiguration.OAuthTokenKey, token, out tokenBody))
 			{
 				if (allowUnauthenticatedUsers)
 					return true;
-				WriteAuthorizationChallenge(ctx, 401, "invalid_token", "The access token is invalid");
+				WriteAuthorizationChallenge(controller, 401, "invalid_token", "The access token is invalid");
 
 				return false;
 			}
@@ -47,28 +51,30 @@ namespace Raven.Database.Server.Security.OAuth
 			{
 				if (allowUnauthenticatedUsers)
 					return true;
-				WriteAuthorizationChallenge(ctx, 401, "invalid_token", "The access token is expired");
+				WriteAuthorizationChallenge(controller, 401, "invalid_token", "The access token is expired");
 
 				return false;
 			}
 
 			var writeAccess = isGetRequest == false;
-			if(!tokenBody.IsAuthorized(TenantId, writeAccess))
+			if(!tokenBody.IsAuthorized(controller.DatabaseName, writeAccess))
 			{
 				if (allowUnauthenticatedUsers || ignoreDbAccess)
 					return true;
 
-				WriteAuthorizationChallenge(ctx, 403, "insufficient_scope", 
+				WriteAuthorizationChallenge(controller, 403, "insufficient_scope", 
 					writeAccess ?
-					"Not authorized for read/write access for tenant " + TenantId :
-					"Not authorized for tenant " + TenantId);
+					"Not authorized for read/write access for tenant " + controller.DatabaseName :
+					"Not authorized for tenant " + controller.DatabaseName);
 	   
 				return false;
 			}
-			
-			ctx.User = new OAuthPrincipal(tokenBody, TenantId);
+
+			HttpContext.Current.User = new OAuthPrincipal(tokenBody, controller.DatabaseName);
+			Thread.CurrentPrincipal = new OAuthPrincipal(tokenBody, controller.DatabaseName);
+
 			CurrentOperationContext.Headers.Value[Constants.RavenAuthenticatedUser] = tokenBody.UserId;
-			CurrentOperationContext.User.Value = ctx.User;
+			CurrentOperationContext.User.Value = controller.User;
 			return true;
 		}
 
@@ -85,14 +91,14 @@ namespace Raven.Database.Server.Security.OAuth
 			
 		}
 
-		static string GetToken(IHttpContext ctx)
+		static string GetToken(RavenApiController controller)
 		{
 			const string bearerPrefix = "Bearer ";
 
-			var auth = ctx.Request.Headers["Authorization"];
+			var auth = controller.GetHeader("Authorization");
 			if(auth == null)
 			{
-				auth = ctx.Request.GetCookie("OAuth-Token");
+				auth = controller.GetCookie("OAuth-Token");
 				if (auth != null)
 					auth = Uri.UnescapeDataString(auth);
 			}
@@ -105,43 +111,47 @@ namespace Raven.Database.Server.Security.OAuth
 			return token;
 		}
 
-		void WriteAuthorizationChallenge(IHttpContext ctx, int statusCode, string error, string errorDescription)
+		void WriteAuthorizationChallenge(RavenApiController controller, int statusCode, string error, string errorDescription)
 		{
-			if (string.IsNullOrEmpty(Settings.OAuthTokenServer) == false)
+			var msg = new HttpResponseMessage();
+
+			if (string.IsNullOrEmpty(controller.DatabasesLandlord.SystemConfiguration.OAuthTokenServer) == false)
 			{
-				if (Settings.UseDefaultOAuthTokenServer == false)
+				if (controller.DatabasesLandlord.SystemConfiguration.UseDefaultOAuthTokenServer == false)
 				{
-					ctx.Response.AddHeader("OAuth-Source", Settings.OAuthTokenServer);
+					controller.AddHeader("OAuth-Source", controller.DatabasesLandlord.SystemConfiguration.OAuthTokenServer, msg);
 				}
 				else
 				{
-					ctx.Response.AddHeader("OAuth-Source", new UriBuilder(Settings.OAuthTokenServer)
+					controller.AddHeader("OAuth-Source", new UriBuilder(controller.DatabasesLandlord.SystemConfiguration.OAuthTokenServer)
 					{
-						Host = ctx.Request.Url.Host,
-						Port = ctx.Request.Url.Port
-					}.Uri.ToString());
+						Host = controller.Request.RequestUri.Host,
+						Port = controller.Request.RequestUri.Port
+					}.Uri.ToString(), msg);
 			
 				}
 			}
-			ctx.Response.StatusCode = statusCode;
-			ctx.Response.AddHeader("WWW-Authenticate", string.Format("Bearer realm=\"Raven\", error=\"{0}\",error_description=\"{1}\"", error, errorDescription));
+			msg.StatusCode = (HttpStatusCode) statusCode;
+			controller.AddHeader("WWW-Authenticate", string.Format("Bearer realm=\"Raven\", error=\"{0}\",error_description=\"{1}\"", error, errorDescription), msg);
+
+			throw new HttpResponseException(msg);
 		}
 
-		public IPrincipal GetUser(IHttpContext ctx, bool hasApiKey)
+		public IPrincipal GetUser(RavenApiController controller, bool hasApiKey)
 		{
-			var token = GetToken(ctx);
+			var token = GetToken(controller);
 
 			if (token == null)
 			{
-				WriteAuthorizationChallenge(ctx, hasApiKey ? 412 : 401, "invalid_request", "The access token is required");
+				WriteAuthorizationChallenge(controller, hasApiKey ? 412 : 401, "invalid_request", "The access token is required");
 
 				return null;
 			}
 
 			AccessTokenBody tokenBody;
-			if (!AccessToken.TryParseBody(Settings.OAuthTokenKey, token, out tokenBody))
+			if (!AccessToken.TryParseBody(controller.DatabasesLandlord.SystemConfiguration.OAuthTokenKey, token, out tokenBody))
 			{
-				WriteAuthorizationChallenge(ctx, 401, "invalid_token", "The access token is invalid");
+				WriteAuthorizationChallenge(controller, 401, "invalid_token", "The access token is invalid");
 
 				return null;
 			}

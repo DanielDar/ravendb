@@ -1,15 +1,18 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Net;
 using System.Security.Principal;
-using Mono.CSharp;
+using System.Threading;
+using System.Web;
+using System.Web.Http;
 using Raven.Abstractions;
 using Raven.Abstractions.Data;
 using Raven.Database.Server.Abstractions;
+using Raven.Database.Server.Controllers;
 using Raven.Database.Server.Security.OAuth;
 using Raven.Database.Server.Security.Windows;
 using System.Linq;
-using Raven.Database.Extensions;
 
 namespace Raven.Database.Server.Security
 {
@@ -52,63 +55,63 @@ namespace Raven.Database.Server.Security
 
 		protected override void Initialize()
 		{
-			windowsRequestAuthorizer.Initialize(database, settings, tenantId, server);
-			oAuthRequestAuthorizer.Initialize(database, settings, tenantId, server);
+			windowsRequestAuthorizer.Initialize(database, server);
+			oAuthRequestAuthorizer.Initialize(database, server);
 			base.Initialize();
 		}
 
-		public bool Authorize(IHttpContext context)
+		public bool Authorize(RavenApiController controller)
 		{
-			var requestUrl = context.GetRequestUrl();
+			var requestUrl = controller.GetRequestUrl();
 			if ( NeverSecret.Urls.Contains(requestUrl))
 				return true;
 
-			var oneTimeToken = context.Request.Headers["Single-Use-Auth-Token"];
+			var oneTimeToken = controller.GetHeader("Single-Use-Auth-Token");
 			if (string.IsNullOrEmpty(oneTimeToken) == false)
 			{
-				return AuthorizeOSingleUseAuthToken(context, oneTimeToken);
+				return AuthorizeOSingleUseAuthToken(controller, oneTimeToken);
 			}
 
-			var authHeader = context.Request.Headers["Authorization"];
-			var hasApiKey = "True".Equals(context.Request.Headers["Has-Api-Key"], StringComparison.CurrentCultureIgnoreCase);
-			var hasOAuthTokenInCookie = context.Request.HasCookie("OAuth-Token");
+			var authHeader = controller.GetHeader("Authorization");
+			var hasApiKey = "True".Equals(controller.GetHeader("Has-Api-Key"), StringComparison.CurrentCultureIgnoreCase);
+			var hasOAuthTokenInCookie = controller.HasCookie("OAuth-Token");
 			if (hasApiKey || hasOAuthTokenInCookie || 
 				string.IsNullOrEmpty(authHeader) == false && authHeader.StartsWith("Bearer "))
 			{
-				return oAuthRequestAuthorizer.Authorize(context, hasApiKey, IgnoreDb.Urls.Contains(requestUrl));
+				return oAuthRequestAuthorizer.Authorize(controller, hasApiKey, IgnoreDb.Urls.Contains(requestUrl));
 			}
-			return windowsRequestAuthorizer.Authorize(context, IgnoreDb.Urls.Contains(requestUrl));
+			return windowsRequestAuthorizer.Authorize(controller, IgnoreDb.Urls.Contains(requestUrl));
 		}
 
-		private bool AuthorizeOSingleUseAuthToken(IHttpContext context, string token)
+		private bool AuthorizeOSingleUseAuthToken(RavenApiController controller, string token)
 		{
 			OneTimeToken value;
 			if (singleUseAuthTokens.TryRemove(token, out value) == false)
 			{
-				context.SetStatusToForbidden();
-				context.WriteJson(new
+				var msg = controller.GetMessageWithObject(new
 				{
 					Error = "Unknown single use token, maybe it was already used?"
-				});
-				return false;
+				}, HttpStatusCode.Forbidden);
+
+				 throw new HttpResponseException(msg);
 			}
-			if (string.Equals(value.DatabaseName, TenantId, StringComparison.InvariantCultureIgnoreCase) == false)
+			if (string.Equals(value.DatabaseName, controller.DatabaseName, StringComparison.InvariantCultureIgnoreCase) == false)
 			{
-				context.SetStatusToForbidden();
-				context.WriteJson(new
+				var msg = controller.GetMessageWithObject(new
 				{
 					Error = "This single use token cannot be used for this database"
-				}); 
-				return false;
+				}, HttpStatusCode.Forbidden);
+
+				throw new HttpResponseException(msg);
 			}
 			if ((SystemTime.UtcNow - value.GeneratedAt).TotalMinutes > 2.5)
 			{
-				context.SetStatusToForbidden();
-				context.WriteJson(new
+				var msg = controller.GetMessageWithObject(new
 				{
 					Error = "This single use token has expired"
-				}); 
-				return false;
+				}, HttpStatusCode.Forbidden);
+
+				throw new HttpResponseException(msg);
 			}
 
 			if (value.User != null)
@@ -116,21 +119,22 @@ namespace Raven.Database.Server.Security
 				CurrentOperationContext.Headers.Value[Constants.RavenAuthenticatedUser] = value.User.Identity.Name;
 			}
 			CurrentOperationContext.User.Value = value.User;
-			context.User = value.User;
+			HttpContext.Current.User = value.User;
+			Thread.CurrentPrincipal = value.User;
 			return true;
 		}
 
-		public IPrincipal GetUser(IHttpContext context)
+		public IPrincipal GetUser(RavenApiController controller)
 		{
-			var hasApiKey = "True".Equals(context.Request.Headers["Has-Api-Key"], StringComparison.CurrentCultureIgnoreCase);
-			var authHeader = context.Request.Headers["Authorization"];
-			var hasOAuthTokenInCookie = context.Request.HasCookie("OAuth-Token");
+			var hasApiKey = "True".Equals(controller.GetQueryStringValue("Has-Api-Key"), StringComparison.CurrentCultureIgnoreCase);
+			var authHeader = controller.GetHeader("Authorization");
+			var hasOAuthTokenInCookie = controller.HasCookie("OAuth-Token");
 			if (hasApiKey || hasOAuthTokenInCookie ||
 				string.IsNullOrEmpty(authHeader) == false && authHeader.StartsWith("Bearer "))
 			{
-				return oAuthRequestAuthorizer.GetUser(context, hasApiKey);
+				return oAuthRequestAuthorizer.GetUser(controller, hasApiKey);
 			}
-			return windowsRequestAuthorizer.GetUser(context);
+			return windowsRequestAuthorizer.GetUser(controller);
 		}
 
 		public List<string> GetApprovedDatabases(IPrincipal user, IHttpContext context)
@@ -150,11 +154,11 @@ namespace Raven.Database.Server.Security
 			oAuthRequestAuthorizer.Dispose();
 		}
 
-		public string GenerateSingleUseAuthToken(DocumentDatabase db, IPrincipal user)
+		public string GenerateSingleUseAuthToken(DocumentDatabase db, IPrincipal user, RavenApiController controller)
 		{
 			var token = new OneTimeToken
 			{
-				DatabaseName = TenantId,
+				DatabaseName = controller.DatabaseName,
 				GeneratedAt = SystemTime.UtcNow,
 				User = user
 			};

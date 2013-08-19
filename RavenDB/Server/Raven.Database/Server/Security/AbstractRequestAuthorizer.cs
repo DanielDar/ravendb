@@ -1,8 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Security.Principal;
-using Raven.Database.Config;
-using Raven.Database.Server.Abstractions;
 using Raven.Database.Server.WebApi;
 
 namespace Raven.Database.Server.Security
@@ -10,24 +6,17 @@ namespace Raven.Database.Server.Security
 	public abstract class AbstractRequestAuthorizer : IDisposable
 	{
 		[CLSCompliant(false)]
-		protected InMemoryRavenConfiguration settings;
-		[CLSCompliant(false)]
 		protected DocumentDatabase database;
 		[CLSCompliant(false)]
 		protected WebApiServer server;
-		[CLSCompliant(false)]
-		protected Func<string> tenantId;
+
 
 		public DocumentDatabase Database { get { return database; } }
-		public InMemoryRavenConfiguration Settings { get { return settings; } }
-		public string TenantId { get { return tenantId(); } }
 
-		public void Initialize(DocumentDatabase database, InMemoryRavenConfiguration settings, Func<string> tenantIdGetter, WebApiServer theServer)
+		public void Initialize(DocumentDatabase database, WebApiServer theServer)
 		{
 			server = theServer;
 			this.database = database;
-			this.settings = settings;
-			this.tenantId = tenantIdGetter;
 
 			Initialize();
 		}

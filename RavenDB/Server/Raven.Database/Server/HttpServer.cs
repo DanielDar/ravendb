@@ -127,7 +127,7 @@ namespace Raven.Database.Server
 				}
 			}
 
-			databasesLandlord = new DatabasesLandlord(resourceStore);
+			//databasesLandlord = new DatabasesLandlord(resourceStore);
 
 			int val;
 			if (int.TryParse(configuration.Settings["Raven/Tenants/MaxIdleTimeForTenantDatabase"], out val) == false)

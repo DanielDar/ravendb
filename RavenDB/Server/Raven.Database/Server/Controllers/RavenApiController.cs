@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
+using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Formatting;
@@ -42,9 +43,12 @@ namespace Raven.Database.Server.Controllers
 			}
 		}
 
-		protected DatabasesLandlord DatabasesLandlord
+		public DatabasesLandlord DatabasesLandlord
 		{
-			get { return ((RavenSelfHostConfigurations)Configuration).Landlord; }
+			get
+			{
+				return ((RavenSelfHostConfigurations)Configuration).Landlord;
+			}
 		}
 
 		public DocumentDatabase Database
@@ -380,6 +384,13 @@ namespace Raven.Database.Server.Controllers
 			WriteETag(etag, msg);
 		}
 
+		public void AddHeader(string key, string value, HttpResponseMessage msg)
+		{
+			if(msg.Content == null)
+				msg.Content = new StringContent("");
+			msg.Content.Headers.Add(key, value);
+		}
+
 		private string GetDateString(RavenJToken token, string format)
 		{
 			var value = token as RavenJValue;
@@ -409,7 +420,7 @@ namespace Raven.Database.Server.Controllers
 			return str;
 		}
 
-		protected HttpResponseMessage GetMessageWithObject(object item, HttpStatusCode code = HttpStatusCode.OK, Etag etag = null)
+		public HttpResponseMessage GetMessageWithObject(object item, HttpStatusCode code = HttpStatusCode.OK, Etag etag = null)
 		{
 			var msg = new HttpResponseMessage(code)
 			{
@@ -425,7 +436,7 @@ namespace Raven.Database.Server.Controllers
 			return msg;
 		}
 
-		protected HttpResponseMessage GetMessageWithString(string msg, HttpStatusCode code = HttpStatusCode.OK, Etag etag = null)
+		public HttpResponseMessage GetMessageWithString(string msg, HttpStatusCode code = HttpStatusCode.OK, Etag etag = null)
 		{
 			var resMsg = new HttpResponseMessage(code)
 			{
@@ -482,11 +493,36 @@ namespace Raven.Database.Server.Controllers
 			return null;
 		}
 
-		private string GetHeader(string key)
+		public string GetHeader(string key)
 		{
 			if (Request.Headers.Contains(key) == false)
 				return null;
 			return Request.Headers.GetValues(key).FirstOrDefault();
+		}
+
+		public List<string> GetHeaders(string key)
+		{
+			if (Request.Headers.Contains(key) == false)
+				return null;
+			return Request.Headers.GetValues(key).ToList();
+		}
+
+		public bool HasCookie(string key)
+		{
+			return Request.Headers.GetCookies(key).Count != 0;
+		}
+
+		public string GetCookie(string key)
+		{
+			var cookieHeaderValue = Request.Headers.GetCookies(key).FirstOrDefault();
+			if (cookieHeaderValue != null)
+			{
+				var coockie = cookieHeaderValue.Cookies.FirstOrDefault();
+				if (coockie != null) 
+					return coockie.Value;
+			}
+
+			return null;
 		}
 
 		protected bool GetCheckForUpdates()

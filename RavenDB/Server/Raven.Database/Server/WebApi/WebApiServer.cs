@@ -19,6 +19,7 @@ using Raven.Database.Server.Abstractions;
 using Raven.Database.Server.Connections;
 using Raven.Database.Server.Controllers;
 using Raven.Database.Server.Responders;
+using Raven.Database.Server.Security;
 using Raven.Database.Server.Tenancy;
 using Raven.Database.Server.WebApi.Handlers;
 
@@ -37,8 +38,8 @@ namespace Raven.Database.Server.WebApi
 			this.configuration = configuration;
 			this.documentDatabase = documentDatabase;
 
-			databasesLandlord = new DatabasesLandlord(documentDatabase);
-
+			databasesLandlord = new DatabasesLandlord(documentDatabase);	
+			databasesLandlord.Initialize(this);
 			config = new RavenSelfHostConfigurations(configuration.ServerUrl, databasesLandlord);
 			config.Formatters.Remove(config.Formatters.XmlFormatter);
 
@@ -53,7 +54,7 @@ namespace Raven.Database.Server.WebApi
 				"Database Route", "databases/{databaseName}/{controller}/{action}",
 				new { id = RouteParameter.Optional });
 			config.MessageHandlers.Add(new GZipToJsonHandler());
-			server = new HttpSelfHostServer(config);			
+			server = new HttpSelfHostServer(config);
 		}
 
 		public bool HasPendingRequests
