@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.Http;
+using ICSharpCode.NRefactory.CSharp;
 using Raven.Abstractions.Data;
 using Raven.Abstractions.Exceptions;
 using Raven.Abstractions.Extensions;
@@ -47,7 +48,7 @@ namespace Raven.Database.Server.Controllers
 		{
 			get
 			{
-				return ((RavenSelfHostConfigurations)Configuration).Landlord;
+				return (DatabasesLandlord) Configuration.Properties[typeof (DatabasesLandlord)];
 			}
 		}
 

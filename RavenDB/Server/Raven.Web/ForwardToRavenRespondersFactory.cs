@@ -4,10 +4,14 @@
 // </copyright>
 //-----------------------------------------------------------------------
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Hosting;
+using System.Web.Http;
+using System.Web.Http.WebHost;
+using System.Web.Routing;
 using Raven.Abstractions.Logging;
 using Raven.Database;
 using Raven.Database.Config;
@@ -67,16 +71,22 @@ namespace Raven.Web
 				throw new InvalidOperationException("Server has not been initialized properly");
 
 			var reqUrl = UrlExtension.GetRequestUrlFromRawUrl(context.Request.RawUrl, database.Configuration);
-
+			 
 			if (WebApiServer.ChangesQuery.IsMatch(reqUrl))
 			{
 				return new ChangesCurrentDatabaseForwardingHandler(server);
 			}
 
-
-			return new ForwardToRavenResponders(server);
+			IRouteHandler handler = HttpControllerRouteHandler.Instance;
+			var wrapper = new HttpContextWrapper(context);
+			var routeData = RouteTable.Routes.GetRouteData(wrapper);
+			if(routeData == null)
+				return null;
+			Debug.Assert(routeData != null);
+			var ctx = new RequestContext(wrapper, routeData);
+			return handler.GetHttpHandler(ctx);
 		}
-
+	
 		public void ReleaseHandler(IHttpHandler handler)
 		{
 		}
@@ -99,6 +109,9 @@ namespace Raven.Web
 					database = new DocumentDatabase(ravenConfiguration);
 					database.SpinBackgroundWorkers();
 					server = new WebApiServer(ravenConfiguration, database);
+
+					server.SetupConfig(GlobalConfiguration.Configuration);
+					
 					server.Init();
 				}
 				catch

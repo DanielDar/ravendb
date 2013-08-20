@@ -738,7 +738,6 @@
     <Compile Include="Server\WebApi\Attributes\HttpEvalAttribute.cs" />
     <Compile Include="Server\WebApi\Attributes\HttpResetAttribute.cs" />
     <Compile Include="Server\WebApi\Handlers\GZipToJsonHandler.cs" />
-    <Compile Include="Server\WebApi\RavenSelfHostConfigurations.cs" />
     <Compile Include="Server\WebApi\WebApiServer.cs" />
     <Compile Include="Smuggler\DataDumper.cs" />
     <Compile Include="Storage\DocumentInTransactionData.cs" />

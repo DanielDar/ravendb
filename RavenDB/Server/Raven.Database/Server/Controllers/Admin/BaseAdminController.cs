@@ -5,6 +5,7 @@ using System.Security.Principal;
 using System.ServiceModel.Security;
 using System.Threading.Tasks;
 using System.Web.Http;
+using Raven.Database.Server.Security;
 using Raven.Database.Server.WebApi;
 
 namespace Raven.Database.Server.Controllers.Admin
@@ -15,14 +16,8 @@ namespace Raven.Database.Server.Controllers.Admin
 		{
 			IPrincipal user;
 			var controller = new AdminController {Request = controllerContext.Request, Configuration = controllerContext.Configuration, ControllerContext = controllerContext, RouteData = controllerContext.RouteData};
-			try
-			{
-				user = ((RavenSelfHostConfigurations) controller.Configuration).Landlord.Authorizer.GetUser(controller);
-			}
-			catch (HttpResponseException e)
-			{
-				return new Task<HttpResponseMessage>(() => e.Response);
-			}
+			var authorizer = (MixedModeRequestAuthorizer)controllerContext.Configuration.Properties[typeof(MixedModeRequestAuthorizer)];
+			user = authorizer.GetUser(controller);
 			
 			if (user == null)
 				return null;

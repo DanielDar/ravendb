@@ -6,19 +6,15 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using System.Web.Http;
 using System.Web.Http.Dispatcher;
 using System.Web.Http.SelfHost;
-using System.Web.Http.Services;
 using Raven.Abstractions;
 using Raven.Abstractions.Util;
 using Raven.Database.Config;
 using Raven.Database.Plugins.Builtins.Tenants;
 using Raven.Database.Server.Abstractions;
-using Raven.Database.Server.Connections;
 using Raven.Database.Server.Controllers;
-using Raven.Database.Server.Responders;
 using Raven.Database.Server.Security;
 using Raven.Database.Server.Tenancy;
 using Raven.Database.Server.WebApi.Handlers;
@@ -28,33 +24,33 @@ namespace Raven.Database.Server.WebApi
 	public class WebApiServer : IDisposable
 	{
 		private readonly InMemoryRavenConfiguration configuration;
-		private readonly DocumentDatabase documentDatabase;
-		private readonly HttpSelfHostConfiguration config;
-		private readonly HttpSelfHostServer server;
-		private DatabasesLandlord databasesLandlord;
+		private HttpSelfHostServer server;
+		private readonly DatabasesLandlord databasesLandlord;
 
 		public WebApiServer(InMemoryRavenConfiguration configuration, DocumentDatabase documentDatabase)
 		{
 			this.configuration = configuration;
-			this.documentDatabase = documentDatabase;
-
 			databasesLandlord = new DatabasesLandlord(documentDatabase);	
-			databasesLandlord.Initialize(this);
-			config = new RavenSelfHostConfigurations(configuration.ServerUrl, databasesLandlord);
-			config.Formatters.Remove(config.Formatters.XmlFormatter);
+			mixedModeRequestAuthorizer.Initialize(documentDatabase, this);
+		}
 
-			config.Services.Replace(typeof(IAssembliesResolver), new MyAssemblyResolver());
+		public void SetupConfig(HttpConfiguration cfg)
+		{
+			cfg.Properties[typeof(DatabasesLandlord)] = databasesLandlord;
+			cfg.Properties[typeof(MixedModeRequestAuthorizer)]= mixedModeRequestAuthorizer;
+			cfg.Formatters.Remove(cfg.Formatters.XmlFormatter);
 
-			config.MapHttpAttributeRoutes();
-			config.Routes.MapHttpRoute(
+			cfg.Services.Replace(typeof(IAssembliesResolver), new MyAssemblyResolver());
+
+			cfg.MapHttpAttributeRoutes();
+			cfg.Routes.MapHttpRoute(
 				"API Default", "{controller}/{action}",
 				new { id = RouteParameter.Optional });
 
-			config.Routes.MapHttpRoute(
+			cfg.Routes.MapHttpRoute(
 				"Database Route", "databases/{databaseName}/{controller}/{action}",
 				new { id = RouteParameter.Optional });
-			config.MessageHandlers.Add(new GZipToJsonHandler());
-			server = new HttpSelfHostServer(config);
+			cfg.MessageHandlers.Add(new GZipToJsonHandler());
 		}
 
 		public bool HasPendingRequests
@@ -73,6 +69,9 @@ namespace Raven.Database.Server.WebApi
 
 		public Task StartListening()
 		{
+			var cfg = new HttpSelfHostConfiguration(configuration.ServerUrl);
+			SetupConfig(cfg);
+			server = new HttpSelfHostServer(cfg);
 			return server.OpenAsync();
 		}
 
@@ -228,6 +227,7 @@ namespace Raven.Database.Server.WebApi
 		private DateTime lastWriteRequest;
 		private readonly TimeSpan frequencyToCheckForIdleDatabases = TimeSpan.FromMinutes(1);
 		private readonly TimeSpan maxTimeDatabaseCanBeIdle;
+		private MixedModeRequestAuthorizer mixedModeRequestAuthorizer = new MixedModeRequestAuthorizer();
 
 		public void Init()
 		{

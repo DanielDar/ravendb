@@ -35,7 +35,6 @@ namespace Raven.Database.Server.Tenancy
 		public readonly AtomicDictionary<Task<DocumentDatabase>> ResourcesStoresCache =
 			new AtomicDictionary<Task<DocumentDatabase>>(StringComparer.OrdinalIgnoreCase);
 		public readonly ConcurrentDictionary<string, DateTime> DatabaseLastRecentlyUsed = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
-		public MixedModeRequestAuthorizer Authorizer { get; private set; }
 
 		protected readonly ConcurrentSet<string> LockedDatabases = new ConcurrentSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -43,12 +42,6 @@ namespace Raven.Database.Server.Tenancy
 		{
 			systemConfiguration = systemDatabase.Configuration;
 			this.systemDatabase = systemDatabase;
-			Authorizer = new MixedModeRequestAuthorizer();
-		}
-
-		public void Initialize(WebApiServer server)
-		{
-			Authorizer.Initialize(systemDatabase, server);
 		}
 
 		public DocumentDatabase SystemDatabase
@@ -439,7 +432,6 @@ namespace Raven.Database.Server.Tenancy
 
 		public void Dispose()
 		{
-			Authorizer.Dispose();
 		}
 	}
 }
